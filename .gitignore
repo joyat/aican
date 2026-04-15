@@ -1,0 +1,46 @@
+## .NET / WPF
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+artifacts/
+publish/
+*.rsuser
+*.user
+*.suo
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+## Node / frontend tooling
+node_modules/
+
+## OS / editor
+.DS_Store
+Thumbs.db
+
+## Runtime data / logs
+.data/
+*.log
+logs/
+
+## Environment / secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+src/AiCan.Api/appsettings.Development.json
+src/AiCan.Api/appsettings.Local.json
+
+## Legacy compatibility
+postgres-data/
+qdrant-data/
