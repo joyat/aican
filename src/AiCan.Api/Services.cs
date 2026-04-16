@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -12,7 +13,20 @@ public sealed class AiCanOptions
     public string RepositoryRoot { get; set; } = "/srv/aican/repository";
     public string LmStudioBaseUrl { get; set; } = "http://127.0.0.1:1234/v1";
     public string LmStudioModel { get; set; } = "local-model";
+    public OpenClawOptions OpenClaw { get; set; } = new();
     public List<SeedUserOptions> SeedUsers { get; set; } = new();
+}
+
+public sealed class OpenClawOptions
+{
+    public bool Enabled { get; set; }
+    public string Command { get; set; } = "openclaw";
+    public string AgentId { get; set; } = "aican";
+    public bool UseLocalRuntime { get; set; } = true;
+    public int TimeoutSeconds { get; set; } = 180;
+    public string? WorkingDirectory { get; set; }
+    public string? StateDir { get; set; }
+    public string? ConfigPath { get; set; }
 }
 
 public sealed class SeedUserOptions
@@ -85,6 +99,11 @@ public interface IAssistantOrchestrator
     Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken);
 }
 
+public interface IAssistantRuntime
+{
+    Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken);
+}
+
 public interface ILLMProvider
 {
     Task<string> GenerateResponseAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, CancellationToken cancellationToken);
@@ -108,6 +127,11 @@ public interface IParserProvider
 public interface IVectorStore
 {
     Task UpsertAsync(Guid documentId, float[] vector, CancellationToken cancellationToken);
+}
+
+public interface IOpenClawRunner
+{
+    Task<string> RunAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, CancellationToken cancellationToken);
 }
 
 public sealed record ClassificationResult(string Category, string CustomerName, string RepositoryPathSegment);
@@ -461,6 +485,190 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
             new SuggestedActionDto(SuggestedActionType.ViewSource, "View source", first.DocumentId.ToString()),
             new SuggestedActionDto(SuggestedActionType.Reclassify, "Suggest reclassification", first.DocumentId.ToString())
         };
+    }
+}
+
+public sealed class AssistantRuntimeRouter : IAssistantRuntime
+{
+    private readonly IOptions<AiCanOptions> _options;
+    private readonly IAssistantOrchestrator _builtIn;
+    private readonly OpenClawAssistantRuntime _openClaw;
+
+    public AssistantRuntimeRouter(
+        IOptions<AiCanOptions> options,
+        IAssistantOrchestrator builtIn,
+        OpenClawAssistantRuntime openClaw)
+    {
+        _options = options;
+        _builtIn = builtIn;
+        _openClaw = openClaw;
+    }
+
+    public async Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken)
+    {
+        if (!_options.Value.OpenClaw.Enabled)
+        {
+            return await _builtIn.RespondAsync(session, request, cancellationToken);
+        }
+
+        try
+        {
+            return await _openClaw.RespondAsync(session, request, cancellationToken);
+        }
+        catch
+        {
+            return await _builtIn.RespondAsync(session, request, cancellationToken);
+        }
+    }
+}
+
+public sealed class OpenClawAssistantRuntime : IAssistantRuntime
+{
+    private readonly IAssistantProfileStore _profiles;
+    private readonly IConversationStore _conversations;
+    private readonly IRetrievalService _retrieval;
+    private readonly IOpenClawRunner _runner;
+
+    public OpenClawAssistantRuntime(
+        IAssistantProfileStore profiles,
+        IConversationStore conversations,
+        IRetrievalService retrieval,
+        IOpenClawRunner runner)
+    {
+        _profiles = profiles;
+        _conversations = conversations;
+        _retrieval = retrieval;
+        _runner = runner;
+    }
+
+    public async Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken)
+    {
+        var profile = _profiles.Get(session.UserId) ?? throw new InvalidOperationException("Assistant profile is missing.");
+        _conversations.Append(session.UserId, MessageRole.User, request.Message);
+
+        var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
+        var context = citations.Count == 0
+            ? "No authorized AiCan citations were found."
+            : string.Join(Environment.NewLine, citations.Select(c => $"- {c.Title}: {c.Snippet} ({c.RepositoryPath})"));
+
+        var prompt = $"""
+            You are {profile.BotName}, the employee-facing AiCan assistant for {profile.DisplayName}.
+            Stay warm, professional, and practical.
+            You are running inside OpenClaw as the conversation runtime.
+            Never claim access beyond the authorized AiCan context below.
+            When you need enterprise data or actions, prefer the configured AiCan tools.
+            The current employee details are:
+            - email: {session.Email}
+            - department: {session.Department}
+            - role: {session.Role}
+            - preferred language: {profile.PreferredLanguage}
+            - work style: {profile.WorkStyle}
+
+            Authorized AiCan context:
+            {context}
+
+            Employee message:
+            {request.Message}
+            """;
+
+        var responseText = await _runner.RunAsync(session, profile, prompt, cancellationToken);
+        _conversations.Append(session.UserId, MessageRole.Assistant, responseText);
+
+        var suggestedActions = BuildSuggestedActions(citations);
+        return new ChatResponse(responseText, citations, suggestedActions);
+    }
+
+    private static IReadOnlyList<SuggestedActionDto> BuildSuggestedActions(IReadOnlyList<CitationDto> citations)
+    {
+        if (citations.Count == 0)
+        {
+            return new[]
+            {
+                new SuggestedActionDto(SuggestedActionType.RequestAccess, "Request access to a library", null)
+            };
+        }
+
+        var first = citations[0];
+        return new[]
+        {
+            new SuggestedActionDto(SuggestedActionType.OpenDocument, "Open document", first.DocumentId.ToString()),
+            new SuggestedActionDto(SuggestedActionType.ViewSource, "View source", first.DocumentId.ToString()),
+            new SuggestedActionDto(SuggestedActionType.Reclassify, "Suggest reclassification", first.DocumentId.ToString())
+        };
+    }
+}
+
+public sealed class OpenClawRunner : IOpenClawRunner
+{
+    private readonly OpenClawOptions _options;
+
+    public OpenClawRunner(IOptions<AiCanOptions> options)
+    {
+        _options = options.Value.OpenClaw;
+    }
+
+    public async Task<string> RunAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, CancellationToken cancellationToken)
+    {
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = _options.Command,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+
+        if (!string.IsNullOrWhiteSpace(_options.WorkingDirectory))
+        {
+            startInfo.WorkingDirectory = _options.WorkingDirectory;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.StateDir))
+        {
+            startInfo.Environment["OPENCLAW_STATE_DIR"] = _options.StateDir;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_options.ConfigPath))
+        {
+            startInfo.Environment["OPENCLAW_CONFIG_PATH"] = _options.ConfigPath;
+        }
+
+        startInfo.ArgumentList.Add("agent");
+        startInfo.ArgumentList.Add("--agent");
+        startInfo.ArgumentList.Add(_options.AgentId);
+        startInfo.ArgumentList.Add("--message");
+        startInfo.ArgumentList.Add(prompt);
+        startInfo.ArgumentList.Add("--timeout");
+        startInfo.ArgumentList.Add(_options.TimeoutSeconds.ToString());
+
+        if (_options.UseLocalRuntime)
+        {
+            startInfo.ArgumentList.Add("--local");
+        }
+
+        using var process = new Process { StartInfo = startInfo };
+        if (!process.Start())
+        {
+            throw new InvalidOperationException("OpenClaw process did not start.");
+        }
+
+        var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+
+        var stdoutText = (await stdout).Trim();
+        var stderrText = (await stderr).Trim();
+
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"OpenClaw failed with exit code {process.ExitCode}: {stderrText}");
+        }
+
+        if (string.IsNullOrWhiteSpace(stdoutText))
+        {
+            throw new InvalidOperationException($"OpenClaw returned no output. stderr: {stderrText}");
+        }
+
+        return stdoutText;
     }
 }
 

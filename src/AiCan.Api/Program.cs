@@ -17,7 +17,11 @@ builder.Services.AddSingleton<IAuditLog, InMemoryAuditLog>();
 builder.Services.AddSingleton<IRetrievalService, RetrievalService>();
 builder.Services.AddSingleton<IClassificationService, FilingClassificationService>();
 builder.Services.AddSingleton<IDocumentIntakeService, DocumentIntakeService>();
-builder.Services.AddSingleton<IAssistantOrchestrator, AssistantOrchestrator>();
+builder.Services.AddSingleton<AssistantOrchestrator>();
+builder.Services.AddSingleton<IAssistantOrchestrator>(sp => sp.GetRequiredService<AssistantOrchestrator>());
+builder.Services.AddSingleton<OpenClawAssistantRuntime>();
+builder.Services.AddSingleton<IOpenClawRunner, OpenClawRunner>();
+builder.Services.AddSingleton<IAssistantRuntime, AssistantRuntimeRouter>();
 builder.Services.AddSingleton<IEmbeddingProvider, DeterministicEmbeddingProvider>();
 builder.Services.AddSingleton<IOcrProvider, NullOcrProvider>();
 builder.Services.AddSingleton<IParserProvider, NullParserProvider>();
@@ -81,7 +85,7 @@ app.MapPost("/assistant/chat", async (
     HttpRequest request,
     ChatRequest chat,
     IUserDirectory users,
-    IAssistantOrchestrator assistant,
+    IAssistantRuntime assistant,
     IAuditLog audit,
     IClock clock,
     CancellationToken cancellationToken) =>
@@ -90,6 +94,64 @@ app.MapPost("/assistant/chat", async (
     var response = await assistant.RespondAsync(session, chat, cancellationToken);
     audit.Write(session.UserId, "assistant.chat", chat.Message, clock.UtcNow);
     return Results.Ok(response);
+});
+
+app.MapPost("/documents/search", (
+    HttpRequest request,
+    DocumentSearchRequest query,
+    IUserDirectory users,
+    IDocumentCatalog catalog) =>
+{
+    var session = users.RequireSession(request);
+    var results = catalog.Search(session.UserId, session.Department, query.Query)
+        .Select(document => new DocumentSearchResultDto(
+            document.Id,
+            document.Title,
+            document.Department,
+            document.Visibility,
+            document.Classification,
+            document.RepositoryPath,
+            document.Summary,
+            document.Suggestion))
+        .ToList();
+    return Results.Ok(new DocumentSearchResponse(results));
+});
+
+app.MapGet("/documents/{documentId:guid}", (
+    HttpRequest request,
+    Guid documentId,
+    IUserDirectory users,
+    IDocumentCatalog catalog) =>
+{
+    var session = users.RequireSession(request);
+    var document = catalog.Get(documentId);
+    if (document is null)
+    {
+        return Results.NotFound();
+    }
+
+    var canRead = document.Visibility switch
+    {
+        VisibilityScope.Private => document.OwnerUserId == session.UserId,
+        VisibilityScope.DepartmentShared => string.Equals(document.Department, session.Department, StringComparison.OrdinalIgnoreCase),
+        VisibilityScope.CommonShared => true,
+        _ => false
+    };
+
+    if (!canRead)
+    {
+        return Results.Forbid();
+    }
+
+    return Results.Ok(new DocumentDetailDto(
+        document.Id,
+        document.Title,
+        document.Department,
+        document.Visibility,
+        document.Classification,
+        document.RepositoryPath,
+        document.Summary,
+        document.Suggestion));
 });
 
 app.MapPost("/documents/intake/register", async (

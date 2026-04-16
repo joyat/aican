@@ -104,6 +104,32 @@ public sealed record IntakeRegisterResponse(
     VisibilityScope Visibility,
     DateTimeOffset RegisteredAtUtc);
 
+public sealed record DocumentSearchRequest(
+    string Query);
+
+public sealed record DocumentSearchResultDto(
+    Guid DocumentId,
+    string Title,
+    string Department,
+    VisibilityScope Visibility,
+    string Classification,
+    string RepositoryPath,
+    string Summary,
+    string? SuggestedCategory);
+
+public sealed record DocumentSearchResponse(
+    IReadOnlyList<DocumentSearchResultDto> Results);
+
+public sealed record DocumentDetailDto(
+    Guid DocumentId,
+    string Title,
+    string Department,
+    VisibilityScope Visibility,
+    string Classification,
+    string RepositoryPath,
+    string Summary,
+    string? SuggestedCategory);
+
 public sealed record AccessRequestDto(
     Guid DocumentId,
     string Reason);

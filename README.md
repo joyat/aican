@@ -8,6 +8,7 @@ AiCan is a Windows desktop bot backed by a centralized server for authentication
 - `src/AiCan.Api`: ASP.NET Core API for sessions, profiles, chat, intake, and actions
 - `src/AiCan.Desktop`: WPF desktop client with onboarding, Microsoft 365 sign-in scaffolding, chat, and watched-folder helper
 - `workers/ai_worker`: FastAPI worker skeleton for OCR/extraction/classification/embedding
+- `integrations/openclaw`: OpenClaw workspace, setup script, and MCP tool server for employee-facing bot runtime
 - `docker-compose.yml`: local PostgreSQL and Qdrant services
 
 ## Current implementation scope
@@ -20,6 +21,8 @@ This scaffold implements the core v1 shape:
 - document intake registration with governed repository path generation
 - watched-folder helper on the desktop client
 - provider interfaces for LLM, embeddings, OCR, parsing, classification, and vector storage
+- OpenClaw runtime routing support with fallback to the built-in assistant
+- document search endpoints and OpenClaw MCP tool exposure scaffolding
 
 The code intentionally uses in-memory stores for application state while keeping the boundaries needed to replace them with PostgreSQL, Qdrant, and persistent background jobs.
 
@@ -32,6 +35,20 @@ The code intentionally uses in-memory stores for application state while keeping
 - seeded users and roles
 
 The API is written so the `ILLMProvider`, `IEmbeddingProvider`, and `IVectorStore` implementations can be swapped without changing the HTTP surface.
+
+## OpenClaw mode
+
+The API can use OpenClaw as the employee-facing assistant runtime.
+
+- set `AiCan:OpenClaw:Enabled=true`
+- ensure the `openclaw` CLI is installed on the server
+- prepare the OpenClaw workspace and MCP bridge with:
+
+  ```bash
+  integrations/openclaw/scripts/setup_local_openclaw.sh
+  ```
+
+When OpenClaw mode is enabled, `/assistant/chat` shells out to `openclaw agent` and falls back to the built-in orchestrator if OpenClaw is unavailable.
 
 ## Project isolation
 
