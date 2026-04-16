@@ -91,6 +91,32 @@ The Python worker is a thin service boundary for:
 4. Build and install the Windows desktop app on the client machine.
 5. Run the Python worker where document enrichment jobs should execute.
 
+## Ubuntu server helper scripts
+
+For the current prototype layout with Ubuntu as the central server:
+
+- `deploy/ubuntu/bootstrap_openclaw.sh`
+  - prepares the OpenClaw workspace and the local AiCan MCP bridge
+- `deploy/ubuntu/start_worker.sh`
+  - creates `.venv/worker`, installs worker dependencies, and starts the worker on port `8001`
+- `deploy/ubuntu/start_api.sh`
+  - starts the ASP.NET Core API on port `5000`
+- `deploy/ubuntu/stop_services.sh`
+  - stops the API and worker processes started by the helper scripts
+
+The helper scripts keep runtime state inside the repo:
+
+- logs: `.runtime/logs/`
+- pid files: `.runtime/pids/`
+- OpenClaw state: `.openclaw/`
+
+For a real deployment on Ubuntu, create an ignored `src/AiCan.Api/appsettings.Local.json` file and set:
+
+- `AiCan:LmStudioBaseUrl` to the Mac host reachable from Ubuntu
+- `AiCan:OpenClaw:Enabled` to `true`
+- `AiCan:OpenClaw:WorkingDirectory` to `/home/joyat/projects/aican`
+- `AiCan:OpenClaw:StateDir` to `/home/joyat/projects/aican/.openclaw`
+
 ## Prototype limitations
 
 - persistence is in-memory inside the API process
