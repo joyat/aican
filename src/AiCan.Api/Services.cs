@@ -904,18 +904,15 @@ public sealed class AssistantRuntimeRouter : IAssistantRuntime
     private readonly IOptions<AiCanOptions> _options;
     private readonly IAssistantOrchestrator _builtIn;
     private readonly OpenClawAssistantRuntime _openClaw;
-    private readonly IRetrievalService _retrieval;
 
     public AssistantRuntimeRouter(
         IOptions<AiCanOptions> options,
         IAssistantOrchestrator builtIn,
-        OpenClawAssistantRuntime openClaw,
-        IRetrievalService retrieval)
+        OpenClawAssistantRuntime openClaw)
     {
         _options = options;
         _builtIn = builtIn;
         _openClaw = openClaw;
-        _retrieval = retrieval;
     }
 
     public async Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken)
@@ -926,12 +923,6 @@ public sealed class AssistantRuntimeRouter : IAssistantRuntime
         }
 
         if (ShouldUseBuiltInFastPath(request.Message))
-        {
-            return await _builtIn.RespondAsync(session, request, cancellationToken);
-        }
-
-        var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
-        if (citations.Count > 0)
         {
             return await _builtIn.RespondAsync(session, request, cancellationToken);
         }
@@ -1007,7 +998,10 @@ public sealed class OpenClawAssistantRuntime : IAssistantRuntime
             You are {profile.BotName}, the employee-facing AiCan assistant for {profile.DisplayName}.
             Stay warm, professional, and practical.
             You are running inside OpenClaw as the conversation runtime.
+            You have access to AiCan's authorized retrieval context below and should answer from it whenever relevant.
+            When the employee uploads or ingests a file into AiCan, treat it as available only if it appears in the authorized context below.
             Never claim access beyond the authorized AiCan context below.
+            Cite the file titles naturally in your answer when you rely on them.
             When you need enterprise data or actions, prefer the configured AiCan tools.
             The current employee details are:
             - email: {session.Email}
