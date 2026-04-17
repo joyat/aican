@@ -15,6 +15,5 @@
   <ItemGroup>
     <Resource Include="Assets\AiCan-wordmark.png" />
     <Resource Include="Assets\AiCan-mascot.png" />
-    <Content Include="Assets\AiCan-mascot.ico" />
   </ItemGroup>
 </Project>
