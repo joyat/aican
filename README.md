@@ -23,6 +23,8 @@ Each employee gets a named personal assistant (e.g. "JoBot" for Jo S). The LLM b
 - `src/AiCan.Desktop` — WPF desktop client with onboarding, chat UI, and watched-folder helper
 - `integrations/openclaw/workspace/` — soul/identity files (`SOUL.md`, `IDENTITY.md`, `AGENTS.md`) that define the bot's personality
 - `workers/ai_worker` — FastAPI worker skeleton for OCR, extraction, classification, and embedding (not yet wired to async queue)
+- `deploy/ubuntu` — helper scripts to start or redeploy the API and worker on the Ubuntu host
+- `deploy/windows` — helper scripts to rebuild and relaunch the desktop app on the Windows demo machine
 
 ## How a chat message flows
 
@@ -30,10 +32,27 @@ Each employee gets a named personal assistant (e.g. "JoBot" for Jo S). The LLM b
 2. Desktop sends `POST /assistant/chat` to the Ubuntu API (with the session token in `X-AiCan-Session`).
 3. The API's `AssistantOrchestrator` runs:
    a. **Instant path** — if the message is `hi`, `hello`, `hey`, or `who are you`, a canned reply is returned immediately (no LLM call).
-   b. **Retrieval** — `RetrievalService` embeds the query, searches chunk vectors in Qdrant with access-tag filters, and returns authorized `CitationDto` objects.
+   b. **History-aware retrieval** — `RetrievalService` embeds an enriched query that includes the latest assistant reply, so short follow-ups such as `how many?` or `same vendor?` can still retrieve the right chunks.
    c. **Prompt assembly** — a user-turn prompt is built containing the bot's name/style, the employee's message, and the authorized citation snippets.
    d. **LLM call** — `LmStudioProvider` sends a `chat/completions` request to LM Studio on the Mac. The system message contains the OpenClaw soul files (SOUL.md + IDENTITY.md + AGENTS.md) plus the employee profile (name, department, tone, work style, language).
-   e. **Response** — the LLM's reply is returned as `ChatResponse.Message`. Citations appear inline at the bottom of the same bubble, formatted as `── Sources: title1  ·  title2`.
+   e. **Conversation carry-forward** — the last several non-system messages are sent to LM Studio as prior turns, so the model sees recent user/assistant context instead of only the latest prompt.
+   f. **Response** — the LLM's reply is returned as `ChatResponse.Message`. Citations appear inline at the bottom of the same bubble, formatted as `── Sources: title1  ·  title2`.
+
+## Desktop app experience
+
+The desktop UI is now tuned for demo use:
+
+- narrower left rail with denser connection and intake panels
+- AiCan-branded dark glass theme that matches the logo colors
+- a slim personality ribbon with only `Warm` / `Formal` and `EN` / `BN`
+- a service deck showing live status tiles for `API`, `LLM`, `Worker`, `Qdrant`, `JoBot`, and `Watch`
+
+The service deck combines:
+
+- remote checks from `GET /system/status` for API-side services
+- local client state for the bot session and the watched-folder helper
+
+This lets the demo operator quickly see whether the issue is the Ubuntu API, LM Studio, the embedding worker, Qdrant, or just a disconnected desktop session.
 
 ## RAG pipeline
 
@@ -88,6 +107,15 @@ LM Studio over Tailscale is slow. Two timeouts are set to prevent hung UIs:
 - **Server** (`WorkerEmbeddingProvider` named HTTP client): defaults to 120 seconds for batch embedding calls.
 - **Desktop client** (`DesktopApiClient`): 180 seconds — matches the server-side budget with margin.
 
+## Health and status endpoints
+
+The API exposes two operational endpoints:
+
+- `GET /healthz` — basic API liveness
+- `GET /system/status` — aggregated checks for `API`, `LLM`, `Worker`, and `Qdrant`
+
+`/system/status` is intended for the Windows service deck and for quick demo troubleshooting. It does not expose document content or tenant data.
+
 ## Bring-up steps (Ubuntu + Windows)
 
 ### Ubuntu infrastructure
@@ -104,6 +132,12 @@ nohup dotnet src/AiCan.Api/bin/Release/net8.0/AiCan.Api.dll \
 
 Make sure `appsettings.Local.json` exists with the correct `LmStudioBaseUrl` before starting. The API will bootstrap the current catalog into Qdrant on startup.
 
+For an in-place API rebuild on Ubuntu, use:
+
+```bash
+bash deploy/ubuntu/deploy_api.sh
+```
+
 ### Windows desktop
 
 ```powershell
@@ -113,6 +147,12 @@ dotnet build src\AiCan.Desktop\AiCan.Desktop.csproj -c Release
 ```
 
 Launch the built `.exe` from `src\AiCan.Desktop\bin\Release\net8.0-windows10.0.19041.0\`. If launching from an SSH session into an RDP machine, use a scheduled task with the `/it` flag so it launches in the interactive user session.
+
+For a rebuild and interactive relaunch on the demo PC, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\rebuild_desktop.ps1
+```
 
 ### Mac (LM Studio)
 
@@ -161,3 +201,5 @@ Files placed in the watched folder (or manually uploaded) are registered via `PO
 - Microsoft 365 OAuth is scaffolded but requires a real Entra app registration to activate.
 - The Python worker is still synchronous and fronted by HTTP; it is not yet wired to an async job queue.
 - Per-employee soul file overrides are not yet implemented — all employees share the same workspace files.
+- Scanned image-only PDFs still need proper OCR hardening for a reliable demo.
+- Cold starts still exist on the first LM Studio or embedding call after the model loads, so demo performance is best after a warm-up query.

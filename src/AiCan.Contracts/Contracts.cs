@@ -145,3 +145,13 @@ public sealed record ActionResponse(
     Guid ActionId,
     string Status,
     DateTimeOffset CreatedAtUtc);
+
+public sealed record ServiceHealthDto(
+    string Key,
+    string Label,
+    string State,
+    string Detail);
+
+public sealed record SystemStatusResponse(
+    IReadOnlyList<ServiceHealthDto> Services,
+    DateTimeOffset CheckedAtUtc);

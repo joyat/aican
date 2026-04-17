@@ -5,366 +5,594 @@
         Icon="Assets/AiCan-mascot.png"
         Width="1340"
         Height="880"
-        MinWidth="1200"
-        MinHeight="780"
+        MinWidth="1100"
+        MinHeight="720"
         WindowStartupLocation="CenterScreen">
+
   <Grid Margin="14">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="320" />
-      <ColumnDefinition Width="14" />
+      <ColumnDefinition Width="268" />
+      <ColumnDefinition Width="12" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
+    <!-- ══════════════════════════════════════════════════
+         LEFT RAIL
+    ══════════════════════════════════════════════════ -->
     <Border Grid.Column="0"
-            CornerRadius="24"
-            Background="{StaticResource AiCanGlassBrush}"
-            BorderBrush="#80FFFFFF"
-            BorderThickness="1"
-            Padding="12">
-      <ScrollViewer VerticalScrollBarVisibility="Auto"
-                    HorizontalScrollBarVisibility="Disabled">
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-          </Grid.RowDefinitions>
+            CornerRadius="18"
+            BorderBrush="#14FFFFFF"
+            BorderThickness="1">
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+          <GradientStop Color="#0D2241" Offset="0" />
+          <GradientStop Color="#081A34" Offset="1" />
+        </LinearGradientBrush>
+      </Border.Background>
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="24" ShadowDepth="0" Color="#000000" Opacity="0.50" />
+      </Border.Effect>
 
-          <Border CornerRadius="20"
-                  Padding="12"
-                  Background="#F6FCFE"
-                  BorderBrush="#BDE2F2"
-                  BorderThickness="1">
-            <StackPanel>
-              <Image Source="Assets/AiCan-wordmark.png"
-                     Height="58"
-                     HorizontalAlignment="Left"
-                     Stretch="Uniform" />
-              <Grid Margin="0,8,0,0">
+      <DockPanel>
+
+        <!-- ── App brand header ── -->
+        <Border DockPanel.Dock="Top"
+                Padding="16,13,16,12"
+                BorderThickness="0,0,0,1"
+                BorderBrush="#0CFFFFFF">
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Image Source="Assets/AiCan-mascot.png"
+                   Width="30" Height="30"
+                   VerticalAlignment="Center"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+            <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+              <TextBlock Text="AiCan"
+                         FontSize="14"
+                         FontWeight="Bold"
+                         Foreground="White" />
+              <TextBlock Text="WORKSPACE"
+                         FontSize="7.5"
+                         FontWeight="SemiBold"
+                         Foreground="#2E5478"
+                         Margin="0,1,0,0" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <ScrollViewer DockPanel.Dock="Bottom"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="12,10,12,12">
+          <StackPanel>
+
+            <!-- ── Bot identity ── -->
+            <Border CornerRadius="14"
+                    Padding="12,10"
+                    Margin="0,0,0,8"
+                    BorderThickness="1">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#0C2642" Offset="0" />
+                  <GradientStop Color="#071B32" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#2ABADF" Offset="0" />
+                  <GradientStop Color="#0E5A88" Offset="1" />
+                </LinearGradientBrush>
+              </Border.BorderBrush>
+              <Border.Effect>
+                <DropShadowEffect Color="#1DCFEF" BlurRadius="14" ShadowDepth="0" Opacity="0.13" />
+              </Border.Effect>
+              <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="44" />
                   <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Width="38"
-                        Height="38"
-                        CornerRadius="19"
-                        Background="#173E76">
-                  <TextBlock x:Name="BotInitialsTextBlock"
-                             HorizontalAlignment="Center"
-                             VerticalAlignment="Center"
-                             FontSize="16"
-                             FontWeight="Bold"
-                             Foreground="White"
-                             Text="JB" />
+                <!-- AiCan logo in identity card -->
+                <Border Width="38" Height="38" CornerRadius="10"
+                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                  <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                      <GradientStop Color="#112B48" Offset="0" />
+                      <GradientStop Color="#0A1F38" Offset="1" />
+                    </LinearGradientBrush>
+                  </Border.Background>
+                  <Image Source="Assets/AiCan-mascot.png"
+                         Width="26" Height="26"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         RenderOptions.BitmapScalingMode="HighQuality" />
                 </Border>
-                <StackPanel Grid.Column="1" Margin="8,0,0,0">
-                  <TextBlock FontSize="10"
-                             Text="Your personal assistant"
-                             Foreground="{StaticResource AiCanSlateBrush}" />
-                  <TextBlock x:Name="BotDisplayNameTextBlock"
-                             Margin="0,2,0,0"
-                             FontSize="21"
+                <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
+                  <TextBlock FontSize="8.5"
+                             Foreground="#29C4E9"
                              FontWeight="SemiBold"
+                             Text="YOUR PERSONAL ASSISTANT" />
+                  <TextBlock x:Name="BotDisplayNameTextBlock"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             Foreground="White"
+                             Margin="0,2,0,2"
                              Text="JoBot" />
                   <TextBlock x:Name="BotMoodTextBlock"
-                             Margin="0,3,0,0"
-                             FontSize="11"
+                             FontSize="9"
+                             Foreground="#3D6080"
                              TextWrapping="Wrap"
-                             Foreground="{StaticResource AiCanSlateBrush}"
-                             Text="Warm, polished, and grounded in your office context." />
+                             Text="Warm and grounded in your office context." />
                 </StackPanel>
               </Grid>
-            </StackPanel>
-          </Border>
+            </Border>
 
-          <Border Grid.Row="1"
-                  Margin="0,8,0,0"
-                  CornerRadius="18"
-                  Padding="12"
-                  Background="#F7FBFF"
-                  BorderBrush="#CFE0F3"
-                  BorderThickness="1">
-            <StackPanel>
-              <TextBlock Text="Connection"
-                         FontSize="15"
-                         FontWeight="SemiBold" />
+            <!-- ── Service Deck ── -->
+            <Border CornerRadius="14"
+                    Padding="10,9"
+                    Margin="0,0,0,8"
+                    BorderThickness="1">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#0F2238" Offset="0" />
+                  <GradientStop Color="#0A1A2C" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.BorderBrush>
+                <SolidColorBrush Color="#162E4A" />
+              </Border.BorderBrush>
+              <StackPanel>
+                <Grid Margin="0,0,0,7">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="SERVICE DECK"
+                             FontSize="9.5"
+                             FontWeight="SemiBold"
+                             Foreground="#29C4E9"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="1"
+                          Width="56"
+                          Height="20"
+                          Content="Refresh"
+                          Click="RefreshServicesButton_Click"
+                          Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
+                <!-- 3 rows × 2 cols of LED chips -->
+                <UniformGrid Columns="2" Rows="3">
+                  <!-- API -->
+                  <Border Margin="0,0,3,3" Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="ApiServiceLed" Width="7" Height="7" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F4C95B" Opacity="0.85" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock Text="API" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="ApiServiceStateText" FontSize="8" Foreground="#3D6080" Text="WAIT" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <!-- LLM -->
+                  <Border Margin="0,0,0,3" Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="LlmServiceLed" Width="7" Height="7" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F4C95B" Opacity="0.85" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock Text="LLM" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="LlmServiceStateText" FontSize="8" Foreground="#3D6080" Text="WAIT" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <!-- Worker -->
+                  <Border Margin="0,0,3,3" Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="WorkerServiceLed" Width="7" Height="7" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F4C95B" Opacity="0.85" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock Text="Worker" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="WorkerServiceStateText" FontSize="8" Foreground="#3D6080" Text="WAIT" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <!-- Qdrant -->
+                  <Border Margin="0,0,0,3" Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="QdrantServiceLed" Width="7" Height="7" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F4C95B" Opacity="0.85" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock Text="Qdrant" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="QdrantServiceStateText" FontSize="8" Foreground="#3D6080" Text="WAIT" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <!-- JoBot -->
+                  <Border Margin="0,0,3,0" Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="JoBotServiceLed" Width="7" Height="7" Fill="#F87171" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F87171" Opacity="0.85" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock x:Name="BotInitialsTextBlock" Text="JoBot" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="JoBotServiceStateText" FontSize="8" Foreground="#3D6080" Text="DOWN" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <!-- Watch -->
+                  <Border Padding="8,5" CornerRadius="8" BorderThickness="1">
+                    <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
+                    <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <Ellipse x:Name="WatchServiceLed" Width="7" Height="7" Fill="#7F8B98" Margin="0,0,6,0">
+                        <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#7F8B98" Opacity="0.65" /></Ellipse.Effect>
+                      </Ellipse>
+                      <StackPanel>
+                        <TextBlock Text="Watch" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="WatchServiceStateText" FontSize="8" Foreground="#3D6080" Text="IDLE" />
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+                </UniformGrid>
+              </StackPanel>
+            </Border>
 
-              <TextBlock Margin="0,6,0,0" FontSize="11" Text="Server URL" />
-              <TextBox x:Name="ServerUrlTextBox" />
+            <!-- ── Connection ── -->
+            <Border CornerRadius="14"
+                    Padding="11,10"
+                    Margin="0,0,0,8"
+                    BorderThickness="1">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#101E2E" Offset="0" />
+                  <GradientStop Color="#0C1826" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.BorderBrush>
+                <SolidColorBrush Color="#1A3050" />
+              </Border.BorderBrush>
+              <StackPanel>
+                <TextBlock Text="CONNECTION"
+                           FontSize="9.5"
+                           FontWeight="SemiBold"
+                           Foreground="#29C4E9"
+                           Margin="0,0,0,8" />
 
-              <TextBlock Margin="0,4,0,0" FontSize="11" Text="Email" />
-              <TextBox x:Name="EmailTextBox" />
+                <TextBlock FontSize="9" Foreground="#2E5070" Text="Server URL" Margin="0,0,0,2" />
+                <TextBox x:Name="ServerUrlTextBox" Margin="0,0,0,6" Padding="8,5" FontSize="11" />
 
-              <Grid Margin="0,4,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="8" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel>
-                  <TextBlock FontSize="11" Text="Display Name" />
-                  <TextBox x:Name="DisplayNameTextBox" />
-                </StackPanel>
-                <StackPanel Grid.Column="2">
-                  <TextBlock FontSize="11" Text="Bot Name" />
-                  <TextBox x:Name="BotNameTextBox" />
-                </StackPanel>
-              </Grid>
+                <TextBlock FontSize="9" Foreground="#2E5070" Text="Email" Margin="0,0,0,2" />
+                <TextBox x:Name="EmailTextBox" Margin="0,0,0,6" Padding="8,5" FontSize="11" />
 
-              <TextBlock Margin="0,4,0,0" FontSize="11" Text="Department" />
-              <TextBox x:Name="DepartmentTextBox" />
+                <!-- Display Name + Bot Name side by side -->
+                <Grid Margin="0,0,0,6">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel>
+                    <TextBlock FontSize="9" Foreground="#2E5070" Text="Display Name" Margin="0,0,0,2" />
+                    <TextBox x:Name="DisplayNameTextBox" Padding="8,5" FontSize="11" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock FontSize="9" Foreground="#2E5070" Text="Bot Name" Margin="0,0,0,2" />
+                    <TextBox x:Name="BotNameTextBox" Padding="8,5" FontSize="11" />
+                  </StackPanel>
+                </Grid>
 
-              <Grid Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="8" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Button x:Name="ConnectButton"
-                        Grid.Column="0"
-                        Height="36"
-                        Content="Connect Bot"
-                        Click="ConnectButton_Click"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-                <Button x:Name="M365Button"
-                        Grid.Column="2"
-                        Height="36"
-                        Content="Use Microsoft 365"
-                        Click="M365Button_Click"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-              </Grid>
-            </StackPanel>
-          </Border>
+                <TextBlock FontSize="9" Foreground="#2E5070" Text="Department" Margin="0,0,0,2" />
+                <TextBox x:Name="DepartmentTextBox" Margin="0,0,0,8" Padding="8,5" FontSize="11" />
 
-          <Border Grid.Row="2"
-                  Margin="0,8,0,0"
-                  CornerRadius="18"
-                  Padding="12"
-                  Background="{StaticResource AiCanMintBrush}">
-            <StackPanel>
-              <TextBlock Text="Document Intake"
-                         FontSize="15"
-                         FontWeight="SemiBold" />
+                <!-- Buttons -->
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Button x:Name="ConnectButton"
+                          Height="30"
+                          Content="Connect Bot"
+                          Click="ConnectButton_Click"
+                          Style="{StaticResource PrimaryButtonStyle}" />
+                  <Button x:Name="M365Button"
+                          Grid.Column="2"
+                          Height="30"
+                          Content="Use M365"
+                          Click="M365Button_Click"
+                          Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
+              </StackPanel>
+            </Border>
 
-              <TextBlock Margin="0,6,0,0" FontSize="11" Text="Watched Folder" />
-              <TextBox x:Name="WatchedFolderTextBox" />
+            <!-- ── Document Intake ── -->
+            <Border CornerRadius="14"
+                    Padding="11,10"
+                    BorderThickness="1">
+              <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#0C1D2E" Offset="0" />
+                  <GradientStop Color="#081422" Offset="1" />
+                </LinearGradientBrush>
+              </Border.Background>
+              <Border.BorderBrush>
+                <SolidColorBrush Color="#152B42" />
+              </Border.BorderBrush>
+              <StackPanel>
+                <TextBlock Text="DOCUMENT INTAKE"
+                           FontSize="9.5"
+                           FontWeight="SemiBold"
+                           Foreground="#29C4E9"
+                           Margin="0,0,0,8" />
 
-              <Grid Margin="0,8,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="8" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <Button Grid.Column="0"
-                        Height="36"
-                        Content="Upload File"
-                        Click="UploadFileButton_Click"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-                <Button Grid.Column="2"
-                        Height="36"
-                        Content="Start Watcher"
-                        Click="WatchFolderButton_Click"
-                        Style="{StaticResource SecondaryButtonStyle}" />
-              </Grid>
-            </StackPanel>
-          </Border>
+                <TextBlock FontSize="9" Foreground="#2E5070" Text="Watched Folder" Margin="0,0,0,2" />
+                <TextBox x:Name="WatchedFolderTextBox" Margin="0,0,0,8" Padding="8,5" FontSize="10.5" />
 
-          <Border Grid.Row="3"
-                  Margin="0,8,0,0"
-                  CornerRadius="18"
-                  Padding="12"
-                  Background="#F8FBFF"
-                  BorderBrush="#D7E5F3"
-                  BorderThickness="1">
-            <StackPanel>
-              <TextBlock Text="Accounts"
-                         FontSize="14"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource AiCanSlateBrush}" />
-              <WrapPanel Margin="0,6,0,0">
-                <TextBlock Margin="0,0,12,0"
-                           FontSize="11"
-                           Foreground="{StaticResource AiCanSlateBrush}"
-                           Text="admin@aican.com" />
-                <TextBlock Margin="0,0,12,0"
-                           FontSize="11"
-                           Foreground="{StaticResource AiCanSlateBrush}"
-                           Text="docadmin@aican.com" />
-                <TextBlock FontSize="11"
-                           Foreground="{StaticResource AiCanSlateBrush}"
-                           Text="user@aican.com" />
-              </WrapPanel>
-            </StackPanel>
-          </Border>
-        </Grid>
-      </ScrollViewer>
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="5" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <Button Grid.Column="0"
+                          Height="30"
+                          Content="Upload File"
+                          Click="UploadFileButton_Click"
+                          Style="{StaticResource PrimaryButtonStyle}" />
+                  <Button Grid.Column="2"
+                          Height="30"
+                          Content="Start Watcher"
+                          Click="WatchFolderButton_Click"
+                          Style="{StaticResource SecondaryButtonStyle}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
     </Border>
 
+    <!-- ══════════════════════════════════════════════════
+         CHAT PANEL
+    ══════════════════════════════════════════════════ -->
     <Border Grid.Column="2"
-            CornerRadius="34"
-            Padding="20"
-            Background="{StaticResource AiCanNavyGlassBrush}"
-            BorderBrush="#4A688F"
+            CornerRadius="22"
+            BorderBrush="#16FFFFFF"
             BorderThickness="1">
-      <Grid>
+      <Border.Background>
+        <LinearGradientBrush StartPoint="0,0" EndPoint="0.15,1">
+          <GradientStop Color="#0E2540" Offset="0" />
+          <GradientStop Color="#081B32" Offset="1" />
+        </LinearGradientBrush>
+      </Border.Background>
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="32" ShadowDepth="0" Color="#000000" Opacity="0.65" />
+      </Border.Effect>
+
+      <Grid Margin="22,18,22,18">
         <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Padding="18"
-                Background="#10233F"
-                BorderBrush="#34537E"
-                BorderThickness="1"
-                CornerRadius="30">
-          <Grid>
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-              <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+        <!-- ── Header ── -->
+        <Grid Margin="0,0,0,14">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <!-- Brand row: logo icon + AiCan text + divider + "workspace" -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,6">
+              <Image Source="Assets/AiCan-logo.png"
+                     Width="20" Height="20"
+                     VerticalAlignment="Center"
+                     RenderOptions.BitmapScalingMode="HighQuality"
+                     Margin="0,0,8,0" />
+              <TextBlock Text="AiCan"
+                         FontSize="12"
+                         FontWeight="Bold"
+                         Foreground="White"
+                         VerticalAlignment="Center" />
+              <TextBlock Text="  ·  "
+                         FontSize="11"
+                         Foreground="#1E4060"
+                         VerticalAlignment="Center" />
+              <TextBlock Text="workspace"
+                         FontSize="11"
+                         Foreground="#2E5880"
+                         VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock x:Name="ConversationTitleTextBlock"
+                       FontSize="26"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       Text="Talk to JoBot" />
+            <TextBlock x:Name="StatusTextBlock"
+                       Margin="0,4,0,0"
+                       Foreground="#2E5070"
+                       FontSize="11.5"
+                       TextWrapping="Wrap"
+                       Text="Connect the bot to begin." />
+          </StackPanel>
+          <!-- Status pill -->
+          <Border Grid.Column="1"
+                  Padding="14,8"
+                  CornerRadius="12"
+                  VerticalAlignment="Top"
+                  BorderThickness="1">
+            <Border.Background>
+              <SolidColorBrush Color="#0A1928" />
+            </Border.Background>
+            <Border.BorderBrush>
+              <SolidColorBrush Color="#162E48" />
+            </Border.BorderBrush>
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="10" ShadowDepth="0" Color="#000000" Opacity="0.35" />
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Ellipse x:Name="StatusLedEllipse"
+                       Width="9" Height="9"
+                       Margin="0,0,8,0"
+                       Fill="#2C4A68">
+                <Ellipse.Effect>
+                  <DropShadowEffect BlurRadius="6" ShadowDepth="0" Color="#2C4A68" Opacity="0.7" />
+                </Ellipse.Effect>
+              </Ellipse>
+              <TextBlock x:Name="StatusWordTextBlock"
+                         Foreground="#4E7090"
+                         FontWeight="SemiBold"
+                         FontSize="11"
+                         Text="OFFLINE" />
+            </StackPanel>
+          </Border>
+        </Grid>
 
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-
-              <StackPanel>
-                <TextBlock Foreground="#CBDCF0"
-                           FontSize="13"
-                           Text="AiCan workspace" />
-                <TextBlock x:Name="ConversationTitleTextBlock"
-                           Margin="0,6,0,0"
-                           FontSize="31"
-                           FontWeight="SemiBold"
-                           Foreground="White"
-                           Text="Talk to JoBot" />
-                <TextBlock x:Name="StatusTextBlock"
-                           Margin="0,10,0,0"
-                           Foreground="#B8CAE2"
-                           TextWrapping="Wrap"
-                           Text="Connect the bot to begin." />
-              </StackPanel>
-
-              <Border Grid.Column="1"
-                      Padding="14,10"
-                      Background="#173056"
-                      BorderBrush="#3D618E"
-                      BorderThickness="1"
-                      CornerRadius="20"
-                      VerticalAlignment="Top">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                  <Ellipse x:Name="StatusLedEllipse"
-                           Width="12"
-                           Height="12"
-                           Margin="0,0,10,0"
-                           Fill="#7B8798" />
-                  <TextBlock x:Name="StatusWordTextBlock"
-                             Foreground="White"
-                             FontWeight="SemiBold"
-                             Text="OFFLINE" />
+        <!-- ── Messages ── -->
+        <Border Grid.Row="1"
+                CornerRadius="16"
+                Padding="4"
+                BorderThickness="1">
+          <Border.Background>
+            <SolidColorBrush Color="#050D18" />
+          </Border.Background>
+          <Border.BorderBrush>
+            <SolidColorBrush Color="#101E30" />
+          </Border.BorderBrush>
+          <ListBox x:Name="MessagesListBox"
+                   Background="Transparent"
+                   BorderThickness="0"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemContainerStyle>
+              <Style TargetType="ListBoxItem">
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Margin" Value="0" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Focusable" Value="False" />
+              </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <StackPanel Margin="10,7,10,3"
+                            HorizontalAlignment="{Binding Alignment}">
+                  <TextBlock Margin="6,0,6,4"
+                             Foreground="{Binding MetaBrush}"
+                             FontSize="10.5"
+                             Text="{Binding Meta}" />
+                  <Border MaxWidth="700"
+                          Padding="14,11"
+                          Background="{Binding BubbleBrush}"
+                          BorderBrush="{Binding BorderBrush}"
+                          BorderThickness="1"
+                          CornerRadius="18">
+                    <Border.Effect>
+                      <DropShadowEffect BlurRadius="12" ShadowDepth="0" Color="#000000" Opacity="0.30" />
+                    </Border.Effect>
+                    <StackPanel>
+                      <TextBlock FontWeight="SemiBold"
+                                 FontSize="11"
+                                 Foreground="{Binding HeaderBrush}"
+                                 Text="{Binding Speaker}" />
+                      <TextBlock Margin="0,6,0,0"
+                                 FontSize="13"
+                                 LineHeight="20"
+                                 TextWrapping="Wrap"
+                                 Foreground="{Binding TextBrush}"
+                                 Text="{Binding Text}" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
-              </Border>
-            </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
 
-            <ListBox Grid.Row="1"
-                     x:Name="MessagesListBox"
-                     Margin="0,18,0,0"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto">
-              <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem">
-                  <Setter Property="BorderThickness" Value="0" />
-                  <Setter Property="Padding" Value="0" />
-                  <Setter Property="Margin" Value="0" />
-                  <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                  <Setter Property="Background" Value="Transparent" />
-                  <Setter Property="Focusable" Value="False" />
-                </Style>
-              </ListBox.ItemContainerStyle>
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <StackPanel Margin="8,8,8,4"
-                              HorizontalAlignment="{Binding Alignment}">
-                    <TextBlock Margin="6,0,6,6"
-                               Foreground="{Binding MetaBrush}"
-                               FontSize="12"
-                               Text="{Binding Meta}" />
-                    <Border MaxWidth="720"
-                            Padding="16,14"
-                            Background="{Binding BubbleBrush}"
-                            BorderBrush="{Binding BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="24">
-                      <StackPanel>
-                        <TextBlock FontWeight="SemiBold"
-                                   Foreground="{Binding HeaderBrush}"
-                                   Text="{Binding Speaker}" />
-                        <TextBlock Margin="0,8,0,0"
-                                   TextWrapping="Wrap"
-                                   Foreground="{Binding TextBrush}"
-                                   Text="{Binding Text}" />
-                      </StackPanel>
-                    </Border>
-                  </StackPanel>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-
-            <Border Grid.Row="2"
-                    Margin="0,16,0,0"
-                    Padding="12"
-                    Background="#173056"
-                    BorderBrush="#3E618C"
-                    BorderThickness="1"
-                    CornerRadius="22">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="132" />
-                </Grid.ColumnDefinitions>
-                <TextBox x:Name="MessageTextBox"
-                         Margin="0"
-                         MinHeight="74"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"
-                         TextWrapping="Wrap" />
-                <Button x:Name="SendButton"
-                        Grid.Column="1"
-                        Margin="14,0,0,0"
-                        Content="Send"
-                        Click="SendButton_Click"
-                        Style="{StaticResource PrimaryButtonStyle}" />
-              </Grid>
-            </Border>
+        <!-- ── Compose box ── -->
+        <Border Grid.Row="2"
+                Margin="0,10,0,0"
+                Padding="12,10"
+                CornerRadius="14"
+                BorderThickness="1">
+          <Border.Background>
+            <SolidColorBrush Color="#07151F" />
+          </Border.Background>
+          <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+              <GradientStop Color="#29C4E9" Offset="0" />
+              <GradientStop Color="#0A5080" Offset="1" />
+            </LinearGradientBrush>
+          </Border.BorderBrush>
+          <Border.Effect>
+            <DropShadowEffect BlurRadius="16" ShadowDepth="0" Color="#29C4E9" Opacity="0.09" />
+          </Border.Effect>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="110" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="MessageTextBox"
+                     Margin="0,0,10,0"
+                     MinLines="1"
+                     MaxLines="6"
+                     Padding="10,8"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     VerticalScrollBarVisibility="Auto"
+                     FontSize="13"
+                     Background="#06FFFFFF"
+                     BorderBrush="#102030"
+                     Foreground="#C8E4F8" />
+            <Button x:Name="SendButton"
+                    Grid.Column="1"
+                    Height="38"
+                    VerticalAlignment="Bottom"
+                    Content="Send"
+                    Click="SendButton_Click"
+                    Style="{StaticResource PrimaryButtonStyle}" />
           </Grid>
         </Border>
 
-        <Border Grid.Row="1"
-                Margin="0,12,0,0"
-                Padding="12,8"
-                Background="#173056"
-                BorderBrush="#3B5E87"
-                BorderThickness="1"
-                CornerRadius="18">
+        <!-- ── Personality ribbon ── -->
+        <Border Grid.Row="3"
+                Margin="0,7,0,0"
+                Padding="12,7"
+                CornerRadius="12"
+                BorderThickness="1">
+          <Border.Background>
+            <SolidColorBrush Color="#06111E" />
+          </Border.Background>
+          <Border.BorderBrush>
+            <SolidColorBrush Color="#102030" />
+          </Border.BorderBrush>
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-
             <TextBlock VerticalAlignment="Center"
-                       Foreground="#DCE8F6"
-                       FontSize="12"
+                       Foreground="#1E4060"
+                       FontSize="9.5"
                        FontWeight="SemiBold"
-                       Text="Personality" />
-
+                       Text="PERSONALITY" />
             <WrapPanel Grid.Column="1"
-                       Margin="14,0,0,0"
+                       Margin="12,0,0,0"
                        VerticalAlignment="Center">
               <RadioButton x:Name="ToneWarmRadio"
                            GroupName="ToneGroup"
@@ -389,17 +617,16 @@
                            Checked="RibbonChanged"
                            Style="{StaticResource RibbonRadioStyle}" />
             </WrapPanel>
-
             <Button x:Name="SaveRibbonButton"
                     Grid.Column="2"
-                    Width="110"
-                    Height="34"
-                    Margin="12,0,0,0"
+                    Width="76"
+                    Height="26"
                     Content="Apply"
                     Click="SaveProfileButton_Click"
                     Style="{StaticResource SecondaryButtonStyle}" />
           </Grid>
         </Border>
+
       </Grid>
     </Border>
   </Grid>

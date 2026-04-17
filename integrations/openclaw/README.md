@@ -1,10 +1,10 @@
 # OpenClaw Integration
 
-This directory holds the OpenClaw workspace files that give the AiCan assistant its personality. The files are loaded as the LLM system prompt — they are **not** used to run the OpenClaw CLI.
+This directory holds the OpenClaw workspace files that give the AiCan assistant its personality. The files are loaded as the LLM system prompt layer — they are **not** used to run the OpenClaw CLI in the current MVP.
 
 ## How it works
 
-`LmStudioProvider` in `src/AiCan.Api/Services.cs` reads the three workspace files once at startup (cached in memory) and injects them as the system message on every LM Studio request, combined with the employee's profile:
+`LmStudioProvider` in `src/AiCan.Api/Services.cs` reads the workspace files once at startup and injects them as the system message on every LM Studio request, combined with the employee's profile:
 
 ```
 [soul content from SOUL.md + IDENTITY.md + AGENTS.md]
@@ -16,6 +16,8 @@ Always stay within the authorized context the user has been given.
 Never claim access to documents that were not provided in the authorized context below.
 When the employee uploads files, treat them as available only when they appear in the authorized context.
 ```
+
+The server also sends several recent non-system conversation turns to LM Studio, so the OpenClaw soul stays consistent across follow-up questions instead of treating every chat as a fresh single turn.
 
 The user turn then carries the actual task prompt plus the citation snippets from retrieval.
 
@@ -57,3 +59,13 @@ To give different employees different personalities, the current approach is to 
 ## Future: MCP tool wiring
 
 `TOOLS.md` and `tools-mcp/` sketch the planned MCP bridge that would let the LLM call AiCan actions (document search, access requests, reclassification) as structured tool calls. This is not yet active — the current retrieval is done server-side by `RetrievalService` before the LLM call, and the results are injected as plain text context.
+
+## Current MVP role split
+
+The current AiCan build uses this split:
+
+- `LM Studio brain` — actual text generation
+- `OpenClaw soul` — tone, persona, and behavioral guardrails
+- `AiCan secured comms + ACL + chunked RAG` — document authorization, retrieval, filing, and citations
+
+This is the intended MVP shape for the employee-facing bot.

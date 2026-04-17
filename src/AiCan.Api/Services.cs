@@ -156,7 +156,7 @@ public interface IAssistantRuntime
 
 public interface ILLMProvider
 {
-    Task<string> GenerateResponseAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, CancellationToken cancellationToken);
+    Task<string> GenerateResponseAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, IReadOnlyList<HistoryMessageDto> priorHistory, CancellationToken cancellationToken);
 }
 
 public interface IEmbeddingProvider
@@ -226,6 +226,11 @@ public interface IDocumentIndexer
 public interface IRagBootstrapper
 {
     Task EnsureIndexedAsync(CancellationToken cancellationToken);
+}
+
+public interface ISystemStatusService
+{
+    Task<SystemStatusResponse> GetStatusAsync(CancellationToken cancellationToken);
 }
 
 public interface IRagIndexStateStore
@@ -1010,6 +1015,93 @@ public sealed class InMemoryAuditLog : IAuditLog
     }
 }
 
+public sealed class SystemStatusService : ISystemStatusService
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly AiCanOptions _options;
+
+    public SystemStatusService(IHttpClientFactory httpClientFactory, IOptions<AiCanOptions> options)
+    {
+        _httpClientFactory = httpClientFactory;
+        _options = options.Value;
+    }
+
+    public async Task<SystemStatusResponse> GetStatusAsync(CancellationToken cancellationToken)
+    {
+        var services = new List<ServiceHealthDto>
+        {
+            new("api", "API", "live", "Ready"),
+            await CheckLmStudioAsync(cancellationToken),
+            await CheckWorkerAsync(cancellationToken),
+            await CheckQdrantAsync(cancellationToken)
+        };
+
+        return new SystemStatusResponse(services, DateTimeOffset.UtcNow);
+    }
+
+    private async Task<ServiceHealthDto> CheckLmStudioAsync(CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = _options.LmStudioBaseUrl.TrimEnd('/') + "/models";
+
+        try
+        {
+            using var response = await client.GetAsync(url, cancellationToken);
+            return response.IsSuccessStatusCode
+                ? new ServiceHealthDto("llm", "LLM", "live", "Ready")
+                : new ServiceHealthDto("llm", "LLM", "down", $"HTTP {(int)response.StatusCode}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ServiceHealthDto("llm", "LLM", "down", TrimDetail(ex.Message));
+        }
+    }
+
+    private async Task<ServiceHealthDto> CheckWorkerAsync(CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = _options.AiWorker.BaseUrl.TrimEnd('/') + "/healthz";
+
+        try
+        {
+            using var response = await client.GetAsync(url, cancellationToken);
+            return response.IsSuccessStatusCode
+                ? new ServiceHealthDto("worker", "Worker", "live", "Ready")
+                : new ServiceHealthDto("worker", "Worker", "down", $"HTTP {(int)response.StatusCode}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ServiceHealthDto("worker", "Worker", "down", TrimDetail(ex.Message));
+        }
+    }
+
+    private async Task<ServiceHealthDto> CheckQdrantAsync(CancellationToken cancellationToken)
+    {
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(5);
+        var url = _options.Qdrant.BaseUrl.TrimEnd('/') + "/healthz";
+
+        try
+        {
+            using var response = await client.GetAsync(url, cancellationToken);
+            return response.IsSuccessStatusCode
+                ? new ServiceHealthDto("qdrant", "Qdrant", "live", "Ready")
+                : new ServiceHealthDto("qdrant", "Qdrant", "down", $"HTTP {(int)response.StatusCode}");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new ServiceHealthDto("qdrant", "Qdrant", "down", TrimDetail(ex.Message));
+        }
+    }
+
+    private static string TrimDetail(string detail)
+    {
+        return detail.Length <= 48 ? detail : detail[..48];
+    }
+}
+
 public sealed class RetrievalService : IRetrievalService
 {
     private readonly IDocumentCatalog _catalog;
@@ -1335,8 +1427,25 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
                 new[] { new SuggestedActionDto(SuggestedActionType.RequestAccess, "Request access to a library", null) });
         }
 
+        // Pull conversation history. The current user turn was just appended above,
+        // so prior history is everything except the last entry.
+        var fullHistory = _conversations.GetHistory(session.UserId);
+        var priorHistory = fullHistory.Count > 1
+            ? fullHistory.Take(fullHistory.Count - 1)
+                         .Where(h => h.Role != MessageRole.System)
+                         .TakeLast(10)
+                         .ToList()
+            : (IReadOnlyList<HistoryMessageDto>)Array.Empty<HistoryMessageDto>();
+
+        // Enrich the retrieval query with the last bot reply so follow-up questions
+        // ("how many?", "same vendor?") can still find the right documents.
+        var lastReply = priorHistory.LastOrDefault(h => h.Role == MessageRole.Assistant)?.Content ?? "";
+        var enrichedQuery = !string.IsNullOrWhiteSpace(lastReply)
+            ? $"{request.Message} {lastReply[..Math.Min(lastReply.Length, 280)]}"
+            : request.Message;
+
         // Retrieve authorized documents to provide as grounded context to the LLM.
-        var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
+        var citations = await _retrieval.RetrieveAsync(session, enrichedQuery, cancellationToken);
 
         var context = citations.Count == 0
             ? "No authorized document citations were found for this query."
@@ -1356,7 +1465,7 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
             {context}
             """;
 
-        var responseText = await _llm.GenerateResponseAsync(session, profile, prompt, cancellationToken);
+        var responseText = await _llm.GenerateResponseAsync(session, profile, prompt, priorHistory, cancellationToken);
         _conversations.Append(session.UserId, MessageRole.Assistant, responseText);
 
         return new ChatResponse(responseText, citations, BuildSuggestedActions(citations));
@@ -1717,7 +1826,7 @@ public sealed class LmStudioProvider : ILLMProvider
             """;
     }
 
-    public async Task<string> GenerateResponseAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, CancellationToken cancellationToken)
+    public async Task<string> GenerateResponseAsync(SessionExchangeResponse session, AssistantProfileDto profile, string prompt, IReadOnlyList<HistoryMessageDto> priorHistory, CancellationToken cancellationToken)
     {
         var client = _httpClientFactory.CreateClient(nameof(LmStudioProvider));
         client.BaseAddress = new Uri(_options.LmStudioBaseUrl.TrimEnd('/') + "/");
@@ -1726,15 +1835,21 @@ public sealed class LmStudioProvider : ILLMProvider
 
         var systemMessage = BuildSystemMessage(profile, session);
 
+        // Build a multi-turn messages list: system → prior history → current prompt.
+        // This gives the LLM full conversational context so follow-up questions make sense.
+        var messages = new List<object> { new { role = "system", content = systemMessage } };
+        foreach (var h in priorHistory)
+        {
+            var role = h.Role == MessageRole.User ? "user" : "assistant";
+            messages.Add(new { role, content = h.Content });
+        }
+        messages.Add(new { role = "user", content = prompt });
+
         var payload = new
         {
             model = _options.LmStudioModel,
             temperature = 0.3,
-            messages = new[]
-            {
-                new { role = "system", content = systemMessage },
-                new { role = "user", content = prompt }
-            }
+            messages = messages.ToArray()
         };
 
         try

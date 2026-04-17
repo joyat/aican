@@ -4,6 +4,8 @@ using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Shapes;
+using System.Windows.Threading;
 using AiCan.Contracts;
 using Microsoft.Win32;
 
@@ -24,6 +26,14 @@ public sealed class ConversationEntry
 
 public partial class MainWindow : Window
 {
+    private enum ServiceLampState
+    {
+        Wait,
+        Live,
+        Warn,
+        Down
+    }
+
     private enum PresenceState
     {
         Offline,
@@ -46,9 +56,11 @@ public partial class MainWindow : Window
     private readonly DesktopApiClient _apiClient = new();
     private readonly DesktopCacheService _cache = new();
     private readonly ObservableCollection<ConversationEntry> _messages = new();
+    private readonly DispatcherTimer _serviceStatusTimer = new() { Interval = TimeSpan.FromSeconds(20) };
     private FolderWatcherService? _watcher;
     private SessionExchangeResponse? _session;
     private bool _isBusy;
+    private bool _serviceDeckRefreshInFlight;
     private bool _watcherActive;
 
     public MainWindow()
@@ -56,6 +68,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         MessagesListBox.ItemsSource = _messages;
 
+        InitializeServiceDeck();
         HookLiveUpdates();
         LoadCachedState();
         RefreshBotIdentity();
@@ -71,6 +84,24 @@ public partial class MainWindow : Window
         DisplayNameTextBox.TextChanged += (_, _) => RefreshBotIdentity();
     }
 
+    private void InitializeServiceDeck()
+    {
+        SetServiceCardState(ApiServiceLed, ApiServiceStateText, ServiceLampState.Wait, "WAIT");
+        SetServiceCardState(LlmServiceLed, LlmServiceStateText, ServiceLampState.Wait, "WAIT");
+        SetServiceCardState(WorkerServiceLed, WorkerServiceStateText, ServiceLampState.Wait, "WAIT");
+        SetServiceCardState(QdrantServiceLed, QdrantServiceStateText, ServiceLampState.Wait, "WAIT");
+
+        UpdateLocalServiceDeck();
+
+        _serviceStatusTimer.Tick += async (_, _) => await RefreshServiceDeckAsync();
+        Loaded += async (_, _) =>
+        {
+            await RefreshServiceDeckAsync();
+            _serviceStatusTimer.Start();
+        };
+        Closed += (_, _) => _serviceStatusTimer.Stop();
+    }
+
     private void LoadCachedState()
     {
         var settings = _cache.Load();
@@ -80,7 +111,7 @@ public partial class MainWindow : Window
         BotNameTextBox.Text = NormalizeBotName(settings?.BotName);
         DepartmentTextBox.Text = settings?.Department ?? DemoDefaults.Department;
         WatchedFolderTextBox.Text = settings?.WatchedFolder
-            ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AiCan", "Inbox");
+            ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AiCan", "Inbox");
 
         SetLanguage(settings?.PreferredLanguage ?? DemoDefaults.PreferredLanguage);
     }
@@ -141,6 +172,8 @@ public partial class MainWindow : Window
         {
             SetBusy(false);
         }
+
+        await RefreshServiceDeckAsync();
     }
 
     private async Task LoadHistoryAsync()
@@ -247,6 +280,7 @@ public partial class MainWindow : Window
             {
                 _watcherActive = true;
                 SetPresence(PresenceState.Watch);
+                UpdateLocalServiceDeck();
                 AddSystemMessage(message);
                 SetStatus(message);
             }));
@@ -254,6 +288,7 @@ public partial class MainWindow : Window
         _watcher.Start();
         _watcherActive = true;
         SetPresence(PresenceState.Watch);
+        UpdateLocalServiceDeck();
         AddSystemMessage($"Watching {WatchedFolderTextBox.Text.Trim()} for new files.");
         SetStatus($"Watching {WatchedFolderTextBox.Text.Trim()}.");
     }
@@ -281,7 +316,7 @@ public partial class MainWindow : Window
 
         try
         {
-            SetBusy(true, $"Uploading {Path.GetFileName(dialog.FileName)}...");
+            SetBusy(true, $"Uploading {System.IO.Path.GetFileName(dialog.FileName)}...");
             var request = await DesktopFileRequestBuilder.CreateAsync(
                 dialog.FileName,
                 DepartmentTextBox.Text.Trim(),
@@ -293,6 +328,7 @@ public partial class MainWindow : Window
             AddSystemMessage(message);
             SetStatus(message);
             SetPresence(_watcherActive ? PresenceState.Watch : PresenceState.Ready);
+            await RefreshServiceDeckAsync();
         }
         catch (Exception ex)
         {
@@ -381,6 +417,11 @@ public partial class MainWindow : Window
         RefreshBotIdentity();
     }
 
+    private async void RefreshServicesButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RefreshServiceDeckAsync();
+    }
+
     private void RefreshBotIdentity()
     {
         if (BotDisplayNameTextBlock is null
@@ -427,6 +468,7 @@ public partial class MainWindow : Window
         }
 
         RefreshActionState();
+        UpdateLocalServiceDeck();
     }
 
     private void RefreshActionState()
@@ -453,6 +495,115 @@ public partial class MainWindow : Window
             PresenceState.Watch => ("WATCH", new SolidColorBrush(Color.FromRgb(78, 205, 196))),
             PresenceState.Error => ("ERROR", new SolidColorBrush(Color.FromRgb(248, 113, 113))),
             _ => ("READY", new SolidColorBrush(Color.FromRgb(74, 222, 128)))
+        };
+
+        UpdateLocalServiceDeck();
+    }
+
+    private async Task RefreshServiceDeckAsync()
+    {
+        UpdateLocalServiceDeck();
+
+        if (_serviceDeckRefreshInFlight)
+        {
+            return;
+        }
+
+        var serverUrl = ServerUrlTextBox?.Text.Trim();
+        if (string.IsNullOrWhiteSpace(serverUrl))
+        {
+            SetServiceCardState(ApiServiceLed, ApiServiceStateText, ServiceLampState.Down, "DOWN");
+            SetServiceCardState(LlmServiceLed, LlmServiceStateText, ServiceLampState.Wait, "WAIT");
+            SetServiceCardState(WorkerServiceLed, WorkerServiceStateText, ServiceLampState.Wait, "WAIT");
+            SetServiceCardState(QdrantServiceLed, QdrantServiceStateText, ServiceLampState.Wait, "WAIT");
+            return;
+        }
+
+        _serviceDeckRefreshInFlight = true;
+        try
+        {
+            var status = await _apiClient.GetSystemStatusAsync(serverUrl);
+            ApplyRemoteServiceState("api", ApiServiceLed, ApiServiceStateText, status.Services);
+            ApplyRemoteServiceState("llm", LlmServiceLed, LlmServiceStateText, status.Services);
+            ApplyRemoteServiceState("worker", WorkerServiceLed, WorkerServiceStateText, status.Services);
+            ApplyRemoteServiceState("qdrant", QdrantServiceLed, QdrantServiceStateText, status.Services);
+        }
+        catch
+        {
+            SetServiceCardState(ApiServiceLed, ApiServiceStateText, ServiceLampState.Down, "DOWN");
+            SetServiceCardState(LlmServiceLed, LlmServiceStateText, ServiceLampState.Down, "DOWN");
+            SetServiceCardState(WorkerServiceLed, WorkerServiceStateText, ServiceLampState.Down, "DOWN");
+            SetServiceCardState(QdrantServiceLed, QdrantServiceStateText, ServiceLampState.Down, "DOWN");
+        }
+        finally
+        {
+            _serviceDeckRefreshInFlight = false;
+        }
+    }
+
+    private void ApplyRemoteServiceState(
+        string key,
+        Ellipse led,
+        TextBlock stateText,
+        IReadOnlyList<ServiceHealthDto> services)
+    {
+        var service = services.FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (service is null)
+        {
+            SetServiceCardState(led, stateText, ServiceLampState.Wait, "WAIT");
+            return;
+        }
+
+        var word = string.Equals(service.State, "live", StringComparison.OrdinalIgnoreCase) ? "LIVE" : "DOWN";
+        var lamp = string.Equals(service.State, "live", StringComparison.OrdinalIgnoreCase)
+            ? ServiceLampState.Live
+            : ServiceLampState.Down;
+
+        SetServiceCardState(led, stateText, lamp, word);
+    }
+
+    private void UpdateLocalServiceDeck()
+    {
+        if (JoBotServiceLed is null
+            || JoBotServiceStateText is null
+            || WatchServiceLed is null
+            || WatchServiceStateText is null)
+        {
+            return;
+        }
+
+        if (_session is null)
+        {
+            SetServiceCardState(JoBotServiceLed, JoBotServiceStateText, ServiceLampState.Down, "DOWN");
+        }
+        else if (_isBusy)
+        {
+            SetServiceCardState(JoBotServiceLed, JoBotServiceStateText, ServiceLampState.Warn, "BUSY");
+        }
+        else
+        {
+            SetServiceCardState(JoBotServiceLed, JoBotServiceStateText, ServiceLampState.Live, "LIVE");
+        }
+
+        if (_watcherActive)
+        {
+            SetServiceCardState(WatchServiceLed, WatchServiceStateText, ServiceLampState.Live, "LIVE");
+        }
+        else
+        {
+            SetServiceCardState(WatchServiceLed, WatchServiceStateText, ServiceLampState.Wait, "IDLE");
+        }
+    }
+
+    private static void SetServiceCardState(Ellipse led, TextBlock stateText, ServiceLampState state, string word)
+    {
+        stateText.Text = word;
+        led.Fill = state switch
+        {
+            ServiceLampState.Live => new SolidColorBrush(Color.FromRgb(74, 222, 128)),
+            ServiceLampState.Warn => new SolidColorBrush(Color.FromRgb(244, 201, 91)),
+            ServiceLampState.Down => new SolidColorBrush(Color.FromRgb(248, 113, 113)),
+            _ => new SolidColorBrush(Color.FromRgb(127, 139, 152))
         };
     }
 

@@ -41,6 +41,7 @@ builder.Services.AddSingleton<IAuditLog, InMemoryAuditLog>();
 builder.Services.AddSingleton<IRetrievalService, RetrievalService>();
 builder.Services.AddSingleton<IClassificationService, FilingClassificationService>();
 builder.Services.AddSingleton<IDocumentIntakeService, DocumentIntakeService>();
+builder.Services.AddSingleton<ISystemStatusService, SystemStatusService>();
 builder.Services.AddSingleton<AssistantOrchestrator>();
 builder.Services.AddSingleton<IAssistantOrchestrator>(sp => sp.GetRequiredService<AssistantOrchestrator>());
 builder.Services.AddSingleton<OpenClawAssistantRuntime>();
@@ -63,6 +64,13 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }));
+
+app.MapGet("/system/status", async (
+    ISystemStatusService status,
+    CancellationToken cancellationToken) =>
+{
+    return Results.Ok(await status.GetStatusAsync(cancellationToken));
+});
 
 app.MapPost("/session/exchange", (
     SessionExchangeRequest request,

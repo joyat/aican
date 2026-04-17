@@ -75,6 +75,14 @@ public sealed class DesktopApiClient
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<SystemStatusResponse> GetSystemStatusAsync(string serverUrl)
+    {
+        using var response = await _httpClient.GetAsync($"{serverUrl.TrimEnd('/')}/system/status");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<SystemStatusResponse>()
+            ?? new SystemStatusResponse(Array.Empty<ServiceHealthDto>(), DateTimeOffset.UtcNow);
+    }
+
     public async Task<SessionExchangeResponse> ExchangeSessionAsync(string serverUrl, SessionExchangeRequest request)
     {
         var response = await _httpClient.PostAsync(
