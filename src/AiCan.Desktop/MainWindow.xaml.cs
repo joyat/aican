@@ -345,11 +345,8 @@ public partial class MainWindow : Window
             MessageTextBox.Clear();
 
             var response = await _apiClient.ChatAsync(ServerUrlTextBox.Text.Trim(), _session.SessionToken, new ChatRequest(userMessage));
-            AddAssistantMessage(response.Message, CurrentBotName());
-            foreach (var citation in response.Citations)
-            {
-                AddSystemMessage($"Citation: {citation.Title} -> {citation.RepositoryPath}");
-            }
+            var displayText = FormatResponseWithCitations(response);
+            AddAssistantMessage(displayText, CurrentBotName());
 
             SetStatus($"Last reply received from {CurrentBotName()}.");
             SetPresence(_watcherActive ? PresenceState.Watch : PresenceState.Ready);
@@ -516,6 +513,22 @@ public partial class MainWindow : Window
         {
             MessagesListBox.ScrollIntoView(_messages[^1]);
         }
+    }
+
+    /// <summary>
+    /// Appends a compact sources line to the LLM reply so citations appear inside the
+    /// bot bubble rather than as separate system messages.
+    /// Example:  "…email body…\n\n── Sources: invoice.txt · printer-summary.md"
+    /// </summary>
+    private static string FormatResponseWithCitations(ChatResponse response)
+    {
+        if (response.Citations.Count == 0)
+        {
+            return response.Message;
+        }
+
+        var titles = string.Join("  ·  ", response.Citations.Select(c => c.Title));
+        return $"{response.Message.TrimEnd()}\n\n\u2500\u2500 Sources: {titles}";
     }
 
     private string CurrentBotName()

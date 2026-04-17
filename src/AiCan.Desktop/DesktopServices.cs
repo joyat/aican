@@ -62,9 +62,11 @@ public sealed class M365AuthService
 
 public sealed class DesktopApiClient
 {
+    // 180 s gives a slow local LLM (LM Studio on Mac over Tailscale) plenty of time
+    // to respond without leaving the UI locked indefinitely.
     private readonly HttpClient _httpClient = new()
     {
-        Timeout = TimeSpan.FromSeconds(30)
+        Timeout = TimeSpan.FromSeconds(180)
     };
 
     public async Task<bool> GetHealthAsync(string serverUrl)

@@ -3,11 +3,34 @@ using AiCan.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Allow a local override file (git-ignored) to override any appsettings.json value.
+// Useful for per-machine secrets such as Tailscale IPs without modifying the committed config.
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
 builder.Services.Configure<AiCanOptions>(builder.Configuration.GetSection("AiCan"));
 builder.Services.AddSingleton<RuntimePathProvider>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
+
+// Named HTTP client for LM Studio with an extended timeout to accommodate slow local models.
+// Adjust LmStudioTimeoutSeconds in appsettings.Local.json if your hardware needs more time.
+builder.Services.AddHttpClient(nameof(LmStudioProvider))
+    .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(120));
+builder.Services.AddHttpClient(nameof(WorkerEmbeddingProvider))
+    .ConfigureHttpClient(client =>
+    {
+        var seconds = builder.Configuration.GetValue<int?>("AiCan:AiWorker:TimeoutSeconds") ?? 120;
+        client.Timeout = TimeSpan.FromSeconds(seconds);
+    });
+builder.Services.AddHttpClient(nameof(WorkerExtractionProvider))
+    .ConfigureHttpClient(client =>
+    {
+        var seconds = builder.Configuration.GetValue<int?>("AiCan:AiWorker:TimeoutSeconds") ?? 120;
+        client.Timeout = TimeSpan.FromSeconds(seconds);
+    });
+builder.Services.AddHttpClient(nameof(QdrantVectorStore))
+    .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<SessionContextAccessor>();
 builder.Services.AddSingleton<IClock, SystemClock>();
 builder.Services.AddSingleton<IUserDirectory, InMemoryUserDirectory>();
@@ -23,10 +46,15 @@ builder.Services.AddSingleton<IAssistantOrchestrator>(sp => sp.GetRequiredServic
 builder.Services.AddSingleton<OpenClawAssistantRuntime>();
 builder.Services.AddSingleton<IOpenClawRunner, OpenClawRunner>();
 builder.Services.AddSingleton<IAssistantRuntime, AssistantRuntimeRouter>();
-builder.Services.AddSingleton<IEmbeddingProvider, DeterministicEmbeddingProvider>();
-builder.Services.AddSingleton<IOcrProvider, NullOcrProvider>();
-builder.Services.AddSingleton<IParserProvider, NullParserProvider>();
-builder.Services.AddSingleton<IVectorStore, InMemoryVectorStore>();
+builder.Services.AddSingleton<TextChunker>();
+builder.Services.AddSingleton<IRagIndexStateStore, RagIndexStateStore>();
+builder.Services.AddSingleton<IDocumentIndexer, DocumentIndexer>();
+builder.Services.AddSingleton<IRagBootstrapper, RagBootstrapper>();
+builder.Services.AddSingleton<IEmbeddingProvider, WorkerEmbeddingProvider>();
+builder.Services.AddSingleton<WorkerExtractionProvider>();
+builder.Services.AddSingleton<IOcrProvider>(sp => sp.GetRequiredService<WorkerExtractionProvider>());
+builder.Services.AddSingleton<IParserProvider>(sp => sp.GetRequiredService<WorkerExtractionProvider>());
+builder.Services.AddSingleton<IVectorStore, QdrantVectorStore>();
 builder.Services.AddSingleton<ILLMProvider, LmStudioProvider>();
 
 var app = builder.Build();
@@ -197,5 +225,7 @@ app.MapPost("/actions/reclassification-suggest", (
     audit.Write(session.UserId, "document.reclassification.suggested", action.DocumentId.ToString(), clock.UtcNow);
     return Results.Ok(response);
 });
+
+await app.Services.GetRequiredService<IRagBootstrapper>().EnsureIndexedAsync(CancellationToken.None);
 
 app.Run();

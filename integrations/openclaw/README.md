@@ -1,60 +1,59 @@
 # OpenClaw Integration
 
-This directory turns OpenClaw into the employee-facing assistant runtime while keeping AiCan as the secure business/API layer.
+This directory holds the OpenClaw workspace files that give the AiCan assistant its personality. The files are loaded as the LLM system prompt — they are **not** used to run the OpenClaw CLI.
 
-## Integration model
+## How it works
 
-- OpenClaw handles assistant persona, memory, and conversation runtime.
-- AiCan remains the system of record for:
-  - user/session mapping
-  - document search and filing
-  - access requests
-  - reclassification suggestions
-  - audit
-- OpenClaw reaches AiCan operations through an MCP tool server defined in `tools-mcp/`.
+`LmStudioProvider` in `src/AiCan.Api/Services.cs` reads the three workspace files once at startup (cached in memory) and injects them as the system message on every LM Studio request, combined with the employee's profile:
 
-## Layout
+```
+[soul content from SOUL.md + IDENTITY.md + AGENTS.md]
 
-- `workspace/`: OpenClaw workspace files for the `aican` agent
-- `tools-mcp/`: MCP server exposing AiCan business actions as typed tools
-- `scripts/setup_local_openclaw.sh`: bootstrap helper for Linux hosts
+You are currently acting as {BotName}, the personal assistant for {DisplayName} ({Email}).
+Department: {Department}. Role: {Role}.
+Preferred language: {PreferredLanguage}. Work style: {WorkStyle}. Tone: {Tone}.
+Always stay within the authorized context the user has been given.
+Never claim access to documents that were not provided in the authorized context below.
+When the employee uploads files, treat them as available only when they appear in the authorized context.
+```
 
-## Expected server layout
+The user turn then carries the actual task prompt plus the citation snippets from retrieval.
 
-Recommended Ubuntu project-local state:
+## Workspace files
 
-- project root: `/home/joyat/projects/aican`
-- OpenClaw state dir: `/home/joyat/projects/aican/.openclaw`
-- OpenClaw workspace: `/home/joyat/projects/aican/.openclaw/workspace-aican`
+| File | Purpose |
+|------|---------|
+| `SOUL.md` | Tone guardrails — friendly but not casual, never bluff, respect privacy |
+| `IDENTITY.md` | Bot name and theme |
+| `AGENTS.md` | Operational rules — stay grounded in authorized context, suggest reclassification rather than inventing locations |
+| `TOOLS.md` | Tool/action catalogue (referenced by AGENTS.md for future MCP wiring) |
 
-## Bootstrap flow
+## Configuration
 
-1. Install OpenClaw and Node/npm on the Ubuntu server.
-2. Run `scripts/setup_local_openclaw.sh`.
-3. Configure the AiCan API with:
-   - `AiCan:OpenClaw:Enabled=true`
-   - correct `Command`, `WorkingDirectory`, and `StateDir`
-4. Start the AiCan API and ensure OpenClaw can run:
+The API reads the workspace directory from `AiCan:WorkspaceRoot` in `appsettings.Local.json`:
 
-   ```bash
-   openclaw agent --agent aican --message "health check" --local
-   ```
+```json
+{
+  "AiCan": {
+    "WorkspaceRoot": "/home/joyat/projects/aican/integrations/openclaw/workspace"
+  }
+}
+```
 
-## Why MCP here
+If `WorkspaceRoot` is empty or the files are missing, `LmStudioProvider` falls back gracefully (soul content is omitted; the employee profile section is still injected).
 
-OpenClaw documents an outbound MCP registry under `mcp.servers`, which can be managed with:
+## OpenClaw CLI runner (disabled)
 
-- `openclaw mcp list`
-- `openclaw mcp set <name> <json>`
+The `AiCan:OpenClaw:Enabled` flag controls whether the API tries to shell out to the `openclaw` CLI binary. This flag is set to `false` in `appsettings.Local.json` because the `openclaw` binary is not installed in the AiCan environment — only the soul/workspace files are used.
 
-This integration uses that registry to define a local stdio MCP server for AiCan tools, so OpenClaw can call:
+The separate `tinman`/`nemoclaw` project on the same Ubuntu server runs a real openclaw-gateway on ports `18789`/`18791`. AiCan does not interact with that project.
 
-- document search
-- access request
-- reclassification suggestion
-- profile lookup
+## Extending the personality
 
-## Current limitations
+To adjust the bot's behaviour, edit the workspace files and restart the API (or call the soul reload endpoint if one is added). Changes take effect immediately on the next startup because the files are loaded once at startup.
 
-- The repo now includes the MCP server and workspace, but the Ubuntu server still needs the final OpenClaw install and config wiring.
-- The current AiCan API runtime shells out to `openclaw agent` and falls back to the built-in orchestrator if OpenClaw is unavailable.
+To give different employees different personalities, the current approach is to maintain one shared workspace. Per-employee soul overrides are a planned future feature.
+
+## Future: MCP tool wiring
+
+`TOOLS.md` and `tools-mcp/` sketch the planned MCP bridge that would let the LLM call AiCan actions (document search, access requests, reclassification) as structured tool calls. This is not yet active — the current retrieval is done server-side by `RetrievalService` before the LLM call, and the results are injected as plain text context.

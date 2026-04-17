@@ -1,157 +1,163 @@
 # AiCan V1
 
-AiCan is a Windows desktop bot backed by a centralized server for authentication, assistant memory, secured retrieval, audit, and document intake.
+AiCan is a Windows desktop bot backed by a centralized Ubuntu API server. The runtime structure is:
+
+- LM Studio brain
+- OpenClaw soul/personality
+- AiCan secured comms + ACL + chunked RAG
+
+Each employee gets a named personal assistant (e.g. "JoBot" for Jo S). The LLM brain runs in LM Studio on the Mac. The secured retrieval layer, chunk index, and ACL enforcement run centrally on Ubuntu. All three machines connect over Tailscale.
+
+## Hardware layout
+
+| Machine | Tailscale IP | Role |
+|---------|-------------|------|
+| Windows desktop | `100.86.148.40` | WPF client — employee-facing |
+| Ubuntu server | `100.97.72.86` | ASP.NET Core API on port 5000, AI worker on port 8001, Qdrant on port 6333 |
+| Mac | `100.81.186.55` | LM Studio running `google/gemma-4-e4b` on port 1234 |
 
 ## Repository layout
 
-- `src/AiCan.Contracts`: shared DTOs and enums used by desktop and server
-- `src/AiCan.Api`: ASP.NET Core API for sessions, profiles, chat, intake, and actions
-- `src/AiCan.Desktop`: WPF desktop client with onboarding, Microsoft 365 sign-in scaffolding, chat, and watched-folder helper
-- `workers/ai_worker`: FastAPI worker skeleton for OCR/extraction/classification/embedding
-- `integrations/openclaw`: OpenClaw workspace, setup script, and MCP tool server for employee-facing bot runtime
-- `docker-compose.yml`: local PostgreSQL and Qdrant services
+- `src/AiCan.Contracts` — shared DTOs and enums used by both client and server
+- `src/AiCan.Api` — ASP.NET Core API handling sessions, profiles, chat, document intake, and retrieval
+- `src/AiCan.Desktop` — WPF desktop client with onboarding, chat UI, and watched-folder helper
+- `integrations/openclaw/workspace/` — soul/identity files (`SOUL.md`, `IDENTITY.md`, `AGENTS.md`) that define the bot's personality
+- `workers/ai_worker` — FastAPI worker skeleton for OCR, extraction, classification, and embedding (not yet wired to async queue)
 
-## Current implementation scope
+## How a chat message flows
 
-This scaffold implements the core v1 shape:
+1. Employee types a message in the WPF desktop app.
+2. Desktop sends `POST /assistant/chat` to the Ubuntu API (with the session token in `X-AiCan-Session`).
+3. The API's `AssistantOrchestrator` runs:
+   a. **Instant path** — if the message is `hi`, `hello`, `hey`, or `who are you`, a canned reply is returned immediately (no LLM call).
+   b. **Retrieval** — `RetrievalService` embeds the query, searches chunk vectors in Qdrant with access-tag filters, and returns authorized `CitationDto` objects.
+   c. **Prompt assembly** — a user-turn prompt is built containing the bot's name/style, the employee's message, and the authorized citation snippets.
+   d. **LLM call** — `LmStudioProvider` sends a `chat/completions` request to LM Studio on the Mac. The system message contains the OpenClaw soul files (SOUL.md + IDENTITY.md + AGENTS.md) plus the employee profile (name, department, tone, work style, language).
+   e. **Response** — the LLM's reply is returned as `ChatResponse.Message`. Citations appear inline at the bottom of the same bubble, formatted as `── Sources: title1  ·  title2`.
 
-- single-user bot profile with friendly preferences and private conversation history
-- central session exchange and role mapping
-- assistant chat endpoint with citations and low-risk suggested actions
-- document intake registration with governed repository path generation and binary upload support
-- watched-folder helper and manual upload flow on the desktop client
-- provider interfaces for LLM, embeddings, OCR, parsing, classification, and vector storage
-- OpenClaw runtime routing support with fallback to the built-in assistant
-- file-backed persistence for sessions, profiles, conversation history, document catalog state, and audit output
-- seeded demo tenant data and seeded demo documents for a live first-run walkthrough
-- document search endpoints and OpenClaw MCP tool exposure scaffolding
+## RAG pipeline
 
-## Server configuration
+Document intake is centralized on Ubuntu:
 
-`src/AiCan.Api/appsettings.json` contains:
+1. The desktop client uploads or registers a file.
+2. The API classifies and stores it under a governed repository path in `.runtime/repository/`.
+3. The API chunks extracted text into overlapping passage windows.
+4. The AI worker embeds each chunk with `intfloat/multilingual-e5-base`.
+5. Chunk vectors and payload metadata are written into Qdrant.
+6. At query time, AiCan searches only chunks the employee is allowed to access.
 
-- repository root and state root
-- LM Studio endpoint
-- seeded users, roles, and demo documents
+Qdrant is kept on the Ubuntu server under `./.data/qdrant`, not on user PCs.
 
-The API is written so the `ILLMProvider`, `IEmbeddingProvider`, and `IVectorStore` implementations can be swapped without changing the HTTP surface.
+## OpenClaw soul files
 
-## OpenClaw mode
+The files under `integrations/openclaw/workspace/` define the bot's personality and are loaded once at startup by `LmStudioProvider.LoadSoulContent()`:
 
-The API can use OpenClaw as the employee-facing assistant runtime.
+- `SOUL.md` — tone and guardrails ("friendly without casual", "never bluff")
+- `IDENTITY.md` — name and theme
+- `AGENTS.md` — operational rules (stay grounded in authorized context, suggest reclassification when needed)
 
-- set `AiCan:OpenClaw:Enabled=true`
-- ensure the `openclaw` CLI is installed on the server
-- prepare the OpenClaw workspace and MCP bridge with:
+These files are injected as the LLM **system message** on every request, combined with the employee's profile. The OpenClaw CLI runner is **disabled** (`OpenClaw:Enabled: false` in `appsettings.Local.json`) — the soul files are used as pure prompt content, not to launch an external process.
 
-  ```bash
-  integrations/openclaw/scripts/setup_local_openclaw.sh
-  ```
+To give a different employee a different personality, edit or extend the workspace files or add per-employee overrides in the profile.
 
-When OpenClaw mode is enabled, `/assistant/chat` shells out to `openclaw agent` and falls back to the built-in orchestrator if OpenClaw is unavailable.
+## Configuration
 
-OpenClaw is also wrapped with a server-side wall-clock timeout so the desktop chat experience does not hang indefinitely if the external bot runtime is slow.
+`src/AiCan.Api/appsettings.json` is the base config committed to the repo. The Ubuntu server also has `src/AiCan.Api/appsettings.Local.json` (not committed) which overrides the relevant values:
 
-## Project isolation
+```json
+{
+  "AiCan": {
+    "LmStudioBaseUrl": "http://100.81.186.55:1234/v1",
+    "WorkspaceRoot": "/home/joyat/projects/aican/integrations/openclaw/workspace",
+    "OpenClaw": {
+      "Enabled": false,
+      "WorkingDirectory": "/home/joyat/projects/aican",
+      "StateDir": "/home/joyat/projects/aican/.openclaw"
+    }
+  }
+}
+```
 
-The server runtime is intended to stay self-contained inside the project folder.
+`appsettings.Local.json` is loaded explicitly in `Program.cs` and takes precedence over `appsettings.json`.
 
-- Docker services use bind mounts under `./.data/`
-- application code stays under `src/` and `workers/`
-- project docs and compose files stay at the repo root
+## HTTP client timeouts
 
-This avoids mixing AiCan runtime data with other projects on the same server.
+LM Studio over Tailscale is slow. Two timeouts are set to prevent hung UIs:
 
-## Desktop client notes
+- **Server** (`LmStudioProvider` named HTTP client): 120 seconds — configured in `Program.cs` via `AddHttpClient`.
+- **Server** (`WorkerEmbeddingProvider` named HTTP client): defaults to 120 seconds for batch embedding calls.
+- **Desktop client** (`DesktopApiClient`): 180 seconds — matches the server-side budget with margin.
 
-The WPF desktop client targets Windows and is designed to:
+## Bring-up steps (Ubuntu + Windows)
 
-- connect directly to the AiCan server for a demo-safe flow
-- optionally attempt Microsoft 365 sign-in once a real Entra app is configured
-- let the user name their bot and store preferences locally
-- restore recent chat history after reconnect
-- keep a watched folder active in the background
-- support manual file upload for live demos
-- call the central server for profile, chat, history, and intake flows
+### Ubuntu infrastructure
+
+```bash
+# From the project root on Ubuntu
+cd /home/joyat/projects/aican
+docker compose up -d qdrant
+bash deploy/ubuntu/start_worker.sh
+dotnet build src/AiCan.Api/AiCan.Api.csproj -c Release
+nohup dotnet src/AiCan.Api/bin/Release/net8.0/AiCan.Api.dll \
+  --urls http://0.0.0.0:5000 > .runtime/logs/api.log 2>&1 &
+```
+
+Make sure `appsettings.Local.json` exists with the correct `LmStudioBaseUrl` before starting. The API will bootstrap the current catalog into Qdrant on startup.
+
+### Windows desktop
+
+```powershell
+# From the project root on Windows
+cd C:\Users\joyat\projects\aican
+dotnet build src\AiCan.Desktop\AiCan.Desktop.csproj -c Release
+```
+
+Launch the built `.exe` from `src\AiCan.Desktop\bin\Release\net8.0-windows10.0.19041.0\`. If launching from an SSH session into an RDP machine, use a scheduled task with the `/it` flag so it launches in the interactive user session.
+
+### Mac (LM Studio)
+
+Load `google/gemma-4-e4b` in LM Studio and start the local server on port 1234. No other configuration needed on the Mac.
+
+## Demo flow
+
+1. On the Mac, confirm LM Studio is running with the model loaded.
+2. On Ubuntu, confirm the API is running (`curl http://100.97.72.86:5000/healthz`).
+3. Open the Windows desktop client and click **Connect Bot**.
+4. Try a starter prompt such as `When did we last purchase a printer?`
+5. Ask it to compose an email: `Compose an email to Bright Stationers requesting a quote for 4 printers.`
+6. Drop a `.txt` or `.md` file into the watched folder and ask the bot about it.
 
 ## Demo tenant
 
-The default seeded tenant uses the hypothetical domain `aican.com`.
+The default seeded tenant uses `aican.com`.
 
-- `admin@aican.com`
-- `docadmin@aican.com`
-- `user@aican.com`
+| Email | Role |
+|-------|------|
+| `admin@aican.com` | PlatformAdmin |
+| `docadmin@aican.com` | DocAdmin |
+| `user@aican.com` | User (default demo) |
 
-The desktop client defaults to the `user@aican.com` demo profile and a named bot (`JoBot`) for `Jo S` so the first-run demo works without additional setup.
+The desktop client defaults to `user@aican.com` / `Jo S` / `JoBot` / `Finance` so the first-run demo needs no additional setup.
 
-The Windows UI is tuned for a guided demo:
+## Project isolation
 
-- direct `Connect Bot` flow
-- status LED with single-word state
-- bottom ribbon controls for tone, work style, and language
-- manual upload plus watched-folder intake
+AiCan is intentionally isolated from the `tinman`/`nemoclaw` project that also runs on the same Ubuntu server on ports `18789`/`18791`. Do not change AiCan's port (5000) and do not restart or modify tinman services.
 
-## Worker notes
+## Document intake and retrieval
 
-The Python worker is a thin service boundary for:
+Files placed in the watched folder (or manually uploaded) are registered via `POST /documents/intake/register`. The API:
 
-- text extraction
-- OCR placeholder orchestration
-- heuristics-based classification
-- deterministic embedding placeholder output
-
-## Bring-up steps
-
-1. Start PostgreSQL and Qdrant:
-
-   ```bash
-   docker compose up -d
-   ```
-
-2. Build and run the API on a machine with the .NET SDK installed.
-3. Point `AiCan.Api` at your LM Studio host.
-4. Build and install the Windows desktop app on the client machine.
-5. Run the Python worker where document enrichment jobs should execute.
-
-## First demo flow
-
-1. Start the Ubuntu helper scripts or equivalent services.
-2. Open the Windows desktop client.
-3. Confirm the server URL points to the Ubuntu API.
-4. Click `Connect Bot`.
-5. Use a starter prompt such as `When did we last purchase a printer?`
-6. Upload a text file or drop one into the watched folder and ask the bot about it.
-
-## Ubuntu server helper scripts
-
-For the current prototype layout with Ubuntu as the central server:
-
-- `deploy/ubuntu/bootstrap_openclaw.sh`
-  - prepares the OpenClaw workspace and the local AiCan MCP bridge
-- `deploy/ubuntu/start_worker.sh`
-  - creates `.venv/worker`, installs worker dependencies, and starts the worker on port `8001`
-- `deploy/ubuntu/start_api.sh`
-  - starts the ASP.NET Core API on port `5000`
-- `deploy/ubuntu/stop_services.sh`
-  - stops the API and worker processes started by the helper scripts
-
-The helper scripts keep runtime state inside the repo:
-
-- logs: `.runtime/logs/`
-- pid files: `.runtime/pids/`
-- OpenClaw state: `.openclaw/`
-
-For a real deployment on Ubuntu, create an ignored `src/AiCan.Api/appsettings.Local.json` file and set:
-
-- `AiCan:LmStudioBaseUrl` to the Mac host reachable from Ubuntu
-- `AiCan:OpenClaw:Enabled` to `true`
-- `AiCan:OpenClaw:WorkingDirectory` to `/home/joyat/projects/aican`
-- `AiCan:OpenClaw:StateDir` to `/home/joyat/projects/aican/.openclaw`
-- optionally override `AiCan:RepositoryRoot` and `AiCan:StateRoot` if you want the stored documents and persisted app state outside the project tree
+1. Assigns a governed repository path based on department, visibility scope, and date.
+2. Writes the file to `.runtime/repository/`.
+3. Adds the document to `InMemoryDocumentCatalog` (file-backed for persistence across restarts).
+4. Chunks the extracted text using overlapping passage windows.
+5. Sends passage batches to the AI worker for multilingual embeddings.
+6. Stores chunk vectors and ACL payload metadata in Qdrant.
+7. On chat queries, retrieves authorized chunks semantically and turns them into citations.
 
 ## Current limitations
 
-- email ingestion is not implemented yet
-- OAuth app registration values must be supplied for real Microsoft 365 sign-in
-- the worker exposes extraction/classification primitives but is not yet wired to an async job queue
-- the current vector store and database services are scaffolded but not yet used as the authoritative persistent source of truth
+- Email ingestion is not yet implemented.
+- Microsoft 365 OAuth is scaffolded but requires a real Entra app registration to activate.
+- The Python worker is still synchronous and fronted by HTTP; it is not yet wired to an async job queue.
+- Per-employee soul file overrides are not yet implemented — all employees share the same workspace files.
