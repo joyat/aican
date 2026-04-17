@@ -3,15 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
   <Application.Resources>
-    <Color x:Key="AiCanInkColor">#0C2558</Color>
-    <Color x:Key="AiCanSlateColor">#4F678A</Color>
-    <Color x:Key="AiCanCloudColor">#F4FAFF</Color>
-    <Color x:Key="AiCanMintColor">#E1F8FB</Color>
-    <Color x:Key="AiCanGoldColor">#59D6F4</Color>
-    <Color x:Key="AiCanTealColor">#22B9E8</Color>
-    <Color x:Key="AiCanRoseColor">#EAF5FF</Color>
-    <Color x:Key="AiCanGlassColor">#D9FFFFFF</Color>
-    <Color x:Key="AiCanNavyGlassColor">#C0122F5C</Color>
+    <Color x:Key="AiCanInkColor">#052D55</Color>
+    <Color x:Key="AiCanSlateColor">#4B6991</Color>
+    <Color x:Key="AiCanCloudColor">#F3FAFD</Color>
+    <Color x:Key="AiCanMintColor">#DDF5FB</Color>
+    <Color x:Key="AiCanGoldColor">#63C8E6</Color>
+    <Color x:Key="AiCanTealColor">#1FA9DA</Color>
+    <Color x:Key="AiCanRoseColor">#E8F7FC</Color>
+    <Color x:Key="AiCanGlassColor">#D4F8FDFF</Color>
+    <Color x:Key="AiCanNavyGlassColor">#C0104A72</Color>
 
     <SolidColorBrush x:Key="AiCanInkBrush" Color="{StaticResource AiCanInkColor}" />
     <SolidColorBrush x:Key="AiCanSlateBrush" Color="{StaticResource AiCanSlateColor}" />
@@ -28,9 +28,9 @@
       <Setter Property="Background">
         <Setter.Value>
           <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-            <GradientStop Color="#F8FCFF" Offset="0" />
-            <GradientStop Color="#E7F4FD" Offset="0.48" />
-            <GradientStop Color="#D6E7F7" Offset="1" />
+            <GradientStop Color="#F5FBFE" Offset="0" />
+            <GradientStop Color="#DDF2FA" Offset="0.46" />
+            <GradientStop Color="#C8E6F5" Offset="1" />
           </LinearGradientBrush>
         </Setter.Value>
       </Setter>
@@ -40,10 +40,10 @@
     <Style TargetType="TextBox">
       <Setter Property="Background" Value="#F9FBFE" />
       <Setter Property="Foreground" Value="{StaticResource AiCanInkBrush}" />
-      <Setter Property="BorderBrush" Value="#D7E1EF" />
+      <Setter Property="BorderBrush" Value="#C7DDF0" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="12,10" />
-      <Setter Property="Margin" Value="0,6,0,12" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="Margin" Value="0,4,0,8" />
     </Style>
 
     <Style x:Key="PrimaryButtonStyle" TargetType="Button">
@@ -51,8 +51,8 @@
       <Setter Property="Foreground" Value="White" />
       <Setter Property="BorderBrush" Value="{StaticResource AiCanTealBrush}" />
       <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="16,10" />
-      <Setter Property="Margin" Value="0,0,10,10" />
+      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="Margin" Value="0,0,8,8" />
       <Setter Property="Cursor" Value="Hand" />
     </Style>
 

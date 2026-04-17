@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\AiCan-mascot.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\AiCan.Contracts\AiCan.Contracts.csproj" />
@@ -12,6 +13,8 @@
     <PackageReference Include="Microsoft.Identity.Client" Version="4.61.3" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Assets\AiCan-logo.png" />
+    <Resource Include="Assets\AiCan-wordmark.png" />
+    <Resource Include="Assets\AiCan-mascot.png" />
+    <Content Include="Assets\AiCan-mascot.ico" />
   </ItemGroup>
 </Project>
