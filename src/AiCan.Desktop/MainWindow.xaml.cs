@@ -386,6 +386,16 @@ public partial class MainWindow : Window
 
     private void RefreshBotIdentity()
     {
+        if (BotDisplayNameTextBlock is null
+            || ConversationTitleTextBlock is null
+            || BotInitialsTextBlock is null
+            || BotMoodTextBlock is null
+            || BotNameTextBox is null
+            || DisplayNameTextBox is null)
+        {
+            return;
+        }
+
         var botName = CurrentBotName();
         var displayName = CurrentDisplayName();
         BotDisplayNameTextBlock.Text = botName;
@@ -520,12 +530,12 @@ public partial class MainWindow : Window
 
     private string SelectedTone()
     {
-        if (ToneDirectRadio.IsChecked == true)
+        if (ToneDirectRadio is not null && ToneDirectRadio.IsChecked == true)
         {
             return "DirectConcise";
         }
 
-        if (ToneFormalRadio.IsChecked == true)
+        if (ToneFormalRadio is not null && ToneFormalRadio.IsChecked == true)
         {
             return "FormalBusiness";
         }
@@ -535,12 +545,12 @@ public partial class MainWindow : Window
 
     private string SelectedWorkStyle()
     {
-        if (StyleDetailedRadio.IsChecked == true)
+        if (StyleDetailedRadio is not null && StyleDetailedRadio.IsChecked == true)
         {
             return "DetailedGuidance";
         }
 
-        if (StyleTaskRadio.IsChecked == true)
+        if (StyleTaskRadio is not null && StyleTaskRadio.IsChecked == true)
         {
             return "TaskDriven";
         }
@@ -550,11 +560,16 @@ public partial class MainWindow : Window
 
     private string SelectedLanguage()
     {
-        return LanguageBanglaRadio.IsChecked == true ? "bn" : "en";
+        return LanguageBanglaRadio is not null && LanguageBanglaRadio.IsChecked == true ? "bn" : "en";
     }
 
     private void SetLanguage(string language)
     {
+        if (LanguageBanglaRadio is null || LanguageEnglishRadio is null)
+        {
+            return;
+        }
+
         if (string.Equals(language, "bn", StringComparison.OrdinalIgnoreCase))
         {
             LanguageBanglaRadio.IsChecked = true;
