@@ -401,7 +401,7 @@ public partial class MainWindow : Window
         BotDisplayNameTextBlock.Text = botName;
         ConversationTitleTextBlock.Text = $"Talk to {botName}";
         BotInitialsTextBlock.Text = BuildInitials(botName);
-        BotMoodTextBlock.Text = $"{botName} supports {displayName} with a {SelectedTone()} tone and a {SelectedWorkStyle()} approach.";
+        BotMoodTextBlock.Text = $"{botName} supports {displayName} with a {SelectedTone()} tone and a helpful office-focused style.";
     }
 
     private void SetBusy(bool isBusy, string? status = null)
@@ -530,11 +530,6 @@ public partial class MainWindow : Window
 
     private string SelectedTone()
     {
-        if (ToneDirectRadio is not null && ToneDirectRadio.IsChecked == true)
-        {
-            return "DirectConcise";
-        }
-
         if (ToneFormalRadio is not null && ToneFormalRadio.IsChecked == true)
         {
             return "FormalBusiness";
@@ -545,16 +540,6 @@ public partial class MainWindow : Window
 
     private string SelectedWorkStyle()
     {
-        if (StyleDetailedRadio is not null && StyleDetailedRadio.IsChecked == true)
-        {
-            return "DetailedGuidance";
-        }
-
-        if (StyleTaskRadio is not null && StyleTaskRadio.IsChecked == true)
-        {
-            return "TaskDriven";
-        }
-
         return "HelpfulAndConcise";
     }
 

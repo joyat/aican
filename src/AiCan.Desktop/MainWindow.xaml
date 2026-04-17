@@ -7,182 +7,189 @@
         MinWidth="1200"
         MinHeight="780"
         WindowStartupLocation="CenterScreen">
-  <Grid Margin="20">
+  <Grid Margin="16">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="356" />
-      <ColumnDefinition Width="18" />
+      <ColumnDefinition Width="344" />
+      <ColumnDefinition Width="16" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
     <Border Grid.Column="0"
-            CornerRadius="30"
+            CornerRadius="28"
             Background="{StaticResource AiCanGlassBrush}"
             BorderBrush="#80FFFFFF"
             BorderThickness="1"
-            Padding="18">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+            Padding="14">
+      <ScrollViewer VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+          </Grid.RowDefinitions>
 
-        <Border CornerRadius="26"
-                Padding="18"
-                Background="{StaticResource AiCanRoseBrush}">
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="64" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Border Width="54"
-                    Height="54"
-                    CornerRadius="27"
-                    Background="{StaticResource AiCanTealBrush}">
-              <TextBlock x:Name="BotInitialsTextBlock"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         FontSize="22"
-                         FontWeight="Bold"
-                         Foreground="White"
-                         Text="JB" />
-            </Border>
-            <StackPanel Grid.Column="1" Margin="14,0,0,0">
-              <TextBlock Text="Friendly employee assistant"
-                         Foreground="{StaticResource AiCanSlateBrush}" />
-              <TextBlock x:Name="BotDisplayNameTextBlock"
-                         Margin="0,4,0,0"
-                         FontSize="28"
-                         FontWeight="SemiBold"
-                         Text="JoBot" />
-              <TextBlock x:Name="BotMoodTextBlock"
-                         Margin="0,6,0,0"
-                         TextWrapping="Wrap"
-                         Foreground="{StaticResource AiCanSlateBrush}"
-                         Text="Warm, polished, and grounded in your office context." />
-            </StackPanel>
-          </Grid>
-        </Border>
-
-        <Border Grid.Row="1"
-                Margin="0,12,0,0"
-                CornerRadius="22"
-                Padding="16"
-                Background="#F7FBFF"
-                BorderBrush="#CFE0F3"
-                BorderThickness="1">
-          <StackPanel>
-            <TextBlock Text="Connection"
-                       FontSize="17"
-                       FontWeight="SemiBold" />
-
-            <TextBlock Margin="0,12,0,0" Text="Server URL" />
-            <TextBox x:Name="ServerUrlTextBox" />
-
-            <TextBlock Margin="0,8,0,0" Text="Email" />
-            <TextBox x:Name="EmailTextBox" />
-
-            <Grid Margin="0,8,0,0">
+          <Border CornerRadius="24"
+                  Padding="14"
+                  Background="{StaticResource AiCanRoseBrush}">
+            <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="54" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
-              <StackPanel>
-                <TextBlock Text="Display Name" />
-                <TextBox x:Name="DisplayNameTextBox" />
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <TextBlock Text="Bot Name" />
-                <TextBox x:Name="BotNameTextBox" />
+              <Border Width="46"
+                      Height="46"
+                      CornerRadius="23"
+                      Background="{StaticResource AiCanTealBrush}">
+                <TextBlock x:Name="BotInitialsTextBlock"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           FontSize="19"
+                           FontWeight="Bold"
+                           Foreground="White"
+                           Text="JB" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                <TextBlock FontSize="12"
+                           Text="Friendly employee assistant"
+                           Foreground="{StaticResource AiCanSlateBrush}" />
+                <TextBlock x:Name="BotDisplayNameTextBlock"
+                           Margin="0,3,0,0"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Text="JoBot" />
+                <TextBlock x:Name="BotMoodTextBlock"
+                           Margin="0,4,0,0"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource AiCanSlateBrush}"
+                           Text="Warm, polished, and grounded in your office context." />
               </StackPanel>
             </Grid>
+          </Border>
 
-            <TextBlock Margin="0,8,0,0" Text="Department" />
-            <TextBox x:Name="DepartmentTextBox" />
-
-            <WrapPanel Margin="0,12,0,0">
-              <Button x:Name="ConnectButton"
-                      Width="140"
-                      Content="Connect Bot"
-                      Click="ConnectButton_Click"
-                      Style="{StaticResource PrimaryButtonStyle}" />
-              <Button x:Name="M365Button"
-                      Width="156"
-                      Content="Use Microsoft 365"
-                      Click="M365Button_Click"
-                      Style="{StaticResource SecondaryButtonStyle}" />
-            </WrapPanel>
-          </StackPanel>
-        </Border>
-
-        <Border Grid.Row="2"
-                Margin="0,12,0,0"
-                CornerRadius="22"
-                Padding="16"
-                Background="{StaticResource AiCanMintBrush}">
-          <StackPanel>
-            <TextBlock Text="Document Intake"
-                       FontSize="17"
-                       FontWeight="SemiBold" />
-
-            <TextBlock Margin="0,12,0,0" Text="Watched Folder" />
-            <TextBox x:Name="WatchedFolderTextBox" />
-
-            <WrapPanel Margin="0,12,0,0">
-              <Button Width="122"
-                      Content="Upload File"
-                      Click="UploadFileButton_Click"
-                      Style="{StaticResource PrimaryButtonStyle}" />
-              <Button Width="138"
-                      Content="Start Watcher"
-                      Click="WatchFolderButton_Click"
-                      Style="{StaticResource SecondaryButtonStyle}" />
-            </WrapPanel>
-          </StackPanel>
-        </Border>
-
-        <Border Grid.Row="3"
-                Margin="0,12,0,0"
-                CornerRadius="22"
-                Padding="16"
-                Background="#F8FBFF"
-                BorderBrush="#D7E5F3"
-                BorderThickness="1">
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+          <Border Grid.Row="1"
+                  Margin="0,10,0,0"
+                  CornerRadius="20"
+                  Padding="14"
+                  Background="#F7FBFF"
+                  BorderBrush="#CFE0F3"
+                  BorderThickness="1">
             <StackPanel>
-              <TextBlock Text="Admin"
+              <TextBlock Text="Connection"
+                         FontSize="16"
+                         FontWeight="SemiBold" />
+
+              <TextBlock Margin="0,8,0,0" FontSize="12" Text="Server URL" />
+              <TextBox x:Name="ServerUrlTextBox" />
+
+              <TextBlock Margin="0,6,0,0" FontSize="12" Text="Email" />
+              <TextBox x:Name="EmailTextBox" />
+
+              <Grid Margin="0,6,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="10" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock FontSize="12" Text="Display Name" />
+                  <TextBox x:Name="DisplayNameTextBox" />
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                  <TextBlock FontSize="12" Text="Bot Name" />
+                  <TextBox x:Name="BotNameTextBox" />
+                </StackPanel>
+              </Grid>
+
+              <TextBlock Margin="0,6,0,0" FontSize="12" Text="Department" />
+              <TextBox x:Name="DepartmentTextBox" />
+
+              <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="10" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="ConnectButton"
+                        Grid.Column="0"
+                        Height="38"
+                        Content="Connect Bot"
+                        Click="ConnectButton_Click"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+                <Button x:Name="M365Button"
+                        Grid.Column="2"
+                        Height="38"
+                        Content="Use Microsoft 365"
+                        Click="M365Button_Click"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Row="2"
+                  Margin="0,10,0,0"
+                  CornerRadius="20"
+                  Padding="14"
+                  Background="{StaticResource AiCanMintBrush}">
+            <StackPanel>
+              <TextBlock Text="Document Intake"
+                         FontSize="16"
+                         FontWeight="SemiBold" />
+
+              <TextBlock Margin="0,8,0,0" FontSize="12" Text="Watched Folder" />
+              <TextBox x:Name="WatchedFolderTextBox" />
+
+              <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="10" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Height="38"
+                        Content="Upload File"
+                        Click="UploadFileButton_Click"
+                        Style="{StaticResource PrimaryButtonStyle}" />
+                <Button Grid.Column="2"
+                        Height="38"
+                        Content="Start Watcher"
+                        Click="WatchFolderButton_Click"
+                        Style="{StaticResource SecondaryButtonStyle}" />
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <Border Grid.Row="3"
+                  Margin="0,10,0,0"
+                  CornerRadius="20"
+                  Padding="14"
+                  Background="#F8FBFF"
+                  BorderBrush="#D7E5F3"
+                  BorderThickness="1">
+            <StackPanel>
+              <TextBlock Text="Accounts"
+                         FontSize="15"
                          FontWeight="SemiBold"
                          Foreground="{StaticResource AiCanSlateBrush}" />
-              <TextBlock Margin="0,4,0,0"
-                         Foreground="{StaticResource AiCanSlateBrush}"
-                         Text="admin@aican.com" />
+              <WrapPanel Margin="0,8,0,0">
+                <TextBlock Margin="0,0,12,0"
+                           FontSize="12"
+                           Foreground="{StaticResource AiCanSlateBrush}"
+                           Text="admin@aican.com" />
+                <TextBlock Margin="0,0,12,0"
+                           FontSize="12"
+                           Foreground="{StaticResource AiCanSlateBrush}"
+                           Text="docadmin@aican.com" />
+                <TextBlock FontSize="12"
+                           Foreground="{StaticResource AiCanSlateBrush}"
+                           Text="user@aican.com" />
+              </WrapPanel>
             </StackPanel>
-            <StackPanel Grid.Column="1" Margin="12,0,0,0">
-              <TextBlock Text="Doc Admin"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource AiCanSlateBrush}" />
-              <TextBlock Margin="0,4,0,0"
-                         Foreground="{StaticResource AiCanSlateBrush}"
-                         Text="docadmin@aican.com" />
-            </StackPanel>
-            <StackPanel Grid.Column="2" Margin="12,0,0,0">
-              <TextBlock Text="User"
-                         FontWeight="SemiBold"
-                         Foreground="{StaticResource AiCanSlateBrush}" />
-              <TextBlock Margin="0,4,0,0"
-                         Foreground="{StaticResource AiCanSlateBrush}"
-                         Text="user@aican.com" />
-            </StackPanel>
-          </Grid>
-        </Border>
-      </Grid>
+          </Border>
+        </Grid>
+      </ScrollViewer>
     </Border>
 
     <Border Grid.Column="2"
@@ -328,28 +335,27 @@
         </Border>
 
         <Border Grid.Row="1"
-                Margin="0,14,0,0"
-                Padding="12,10"
+                Margin="0,12,0,0"
+                Padding="12,8"
                 Background="#173056"
                 BorderBrush="#3B5E87"
                 BorderThickness="1"
-                CornerRadius="22">
+                CornerRadius="18">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="*" />
               <ColumnDefinition Width="*" />
               <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <TextBlock VerticalAlignment="Center"
                        Foreground="#DCE8F6"
-                       FontSize="13"
+                       FontSize="12"
                        FontWeight="SemiBold"
                        Text="Personality" />
 
             <WrapPanel Grid.Column="1"
-                       Margin="16,0,0,0"
+                       Margin="14,0,0,0"
                        VerticalAlignment="Center">
               <RadioButton x:Name="ToneWarmRadio"
                            GroupName="ToneGroup"
@@ -357,35 +363,9 @@
                            IsChecked="True"
                            Checked="RibbonChanged"
                            Style="{StaticResource RibbonRadioStyle}" />
-              <RadioButton x:Name="ToneDirectRadio"
-                           GroupName="ToneGroup"
-                           Content="Direct"
-                           Checked="RibbonChanged"
-                           Style="{StaticResource RibbonRadioStyle}" />
               <RadioButton x:Name="ToneFormalRadio"
                            GroupName="ToneGroup"
                            Content="Formal"
-                           Checked="RibbonChanged"
-                           Style="{StaticResource RibbonRadioStyle}" />
-            </WrapPanel>
-
-            <WrapPanel Grid.Column="2"
-                       Margin="16,0,0,0"
-                       VerticalAlignment="Center">
-              <RadioButton x:Name="StyleHelpfulRadio"
-                           GroupName="StyleGroup"
-                           Content="Helpful"
-                           IsChecked="True"
-                           Checked="RibbonChanged"
-                           Style="{StaticResource RibbonRadioStyle}" />
-              <RadioButton x:Name="StyleDetailedRadio"
-                           GroupName="StyleGroup"
-                           Content="Detailed"
-                           Checked="RibbonChanged"
-                           Style="{StaticResource RibbonRadioStyle}" />
-              <RadioButton x:Name="StyleTaskRadio"
-                           GroupName="StyleGroup"
-                           Content="Task"
                            Checked="RibbonChanged"
                            Style="{StaticResource RibbonRadioStyle}" />
               <RadioButton x:Name="LanguageEnglishRadio"
@@ -402,9 +382,10 @@
             </WrapPanel>
 
             <Button x:Name="SaveRibbonButton"
-                    Grid.Column="3"
-                    Width="138"
-                    Margin="16,0,0,0"
+                    Grid.Column="2"
+                    Width="110"
+                    Height="34"
+                    Margin="12,0,0,0"
                     Content="Apply"
                     Click="SaveProfileButton_Click"
                     Style="{StaticResource SecondaryButtonStyle}" />
