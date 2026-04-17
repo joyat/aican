@@ -1,7 +1,8 @@
 <Window x:Class="AiCan.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AiCan Desktop"
+        Title="AiCan"
+        Icon="Assets/AiCan-logo.png"
         Width="1340"
         Height="880"
         MinWidth="1200"
@@ -32,41 +33,49 @@
 
           <Border CornerRadius="24"
                   Padding="14"
-                  Background="{StaticResource AiCanRoseBrush}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="54" />
-                <ColumnDefinition Width="*" />
-              </Grid.ColumnDefinitions>
-              <Border Width="46"
-                      Height="46"
-                      CornerRadius="23"
-                      Background="{StaticResource AiCanTealBrush}">
-                <TextBlock x:Name="BotInitialsTextBlock"
-                           HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           FontSize="19"
-                           FontWeight="Bold"
-                           Foreground="White"
-                           Text="JB" />
-              </Border>
-              <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                <TextBlock FontSize="12"
-                           Text="Friendly employee assistant"
-                           Foreground="{StaticResource AiCanSlateBrush}" />
-                <TextBlock x:Name="BotDisplayNameTextBlock"
-                           Margin="0,3,0,0"
-                           FontSize="24"
-                           FontWeight="SemiBold"
-                           Text="JoBot" />
-                <TextBlock x:Name="BotMoodTextBlock"
-                           Margin="0,4,0,0"
-                           FontSize="12"
-                           TextWrapping="Wrap"
-                           Foreground="{StaticResource AiCanSlateBrush}"
-                           Text="Warm, polished, and grounded in your office context." />
-              </StackPanel>
-            </Grid>
+                  Background="#F8FDFF"
+                  BorderBrush="#C7E7F8"
+                  BorderThickness="1">
+            <StackPanel>
+              <Image Source="Assets/AiCan-logo.png"
+                     Height="78"
+                     HorizontalAlignment="Left"
+                     Stretch="Uniform" />
+              <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="48" />
+                  <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="42"
+                        Height="42"
+                        CornerRadius="21"
+                        Background="{StaticResource AiCanTealBrush}">
+                  <TextBlock x:Name="BotInitialsTextBlock"
+                             HorizontalAlignment="Center"
+                             VerticalAlignment="Center"
+                             FontSize="18"
+                             FontWeight="Bold"
+                             Foreground="White"
+                             Text="JB" />
+                </Border>
+                <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                  <TextBlock FontSize="11"
+                             Text="Branded employee assistant"
+                             Foreground="{StaticResource AiCanSlateBrush}" />
+                  <TextBlock x:Name="BotDisplayNameTextBlock"
+                             Margin="0,2,0,0"
+                             FontSize="23"
+                             FontWeight="SemiBold"
+                             Text="JoBot" />
+                  <TextBlock x:Name="BotMoodTextBlock"
+                             Margin="0,4,0,0"
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             Foreground="{StaticResource AiCanSlateBrush}"
+                             Text="Warm, polished, and grounded in your office context." />
+                </StackPanel>
+              </Grid>
+            </StackPanel>
           </Border>
 
           <Border Grid.Row="1"
@@ -225,7 +234,7 @@
               <StackPanel>
                 <TextBlock Foreground="#CBDCF0"
                            FontSize="13"
-                           Text="Employee-facing bot workspace" />
+                           Text="AiCan workspace" />
                 <TextBlock x:Name="ConversationTitleTextBlock"
                            Margin="0,6,0,0"
                            FontSize="31"
