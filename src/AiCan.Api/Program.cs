@@ -4,6 +4,7 @@ using AiCan.Contracts;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<AiCanOptions>(builder.Configuration.GetSection("AiCan"));
+builder.Services.AddSingleton<RuntimePathProvider>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();

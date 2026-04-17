@@ -10,11 +10,13 @@ namespace AiCan.Api;
 
 public sealed class AiCanOptions
 {
-    public string RepositoryRoot { get; set; } = "/srv/aican/repository";
+    public string RepositoryRoot { get; set; } = ".runtime/repository";
+    public string StateRoot { get; set; } = ".runtime/state";
     public string LmStudioBaseUrl { get; set; } = "http://127.0.0.1:1234/v1";
     public string LmStudioModel { get; set; } = "local-model";
     public OpenClawOptions OpenClaw { get; set; } = new();
     public List<SeedUserOptions> SeedUsers { get; set; } = new();
+    public List<SeedDocumentOptions> SeedDocuments { get; set; } = new();
 }
 
 public sealed class OpenClawOptions
@@ -23,7 +25,7 @@ public sealed class OpenClawOptions
     public string Command { get; set; } = "openclaw";
     public string AgentId { get; set; } = "aican";
     public bool UseLocalRuntime { get; set; } = true;
-    public int TimeoutSeconds { get; set; } = 180;
+    public int TimeoutSeconds { get; set; } = 30;
     public string? WorkingDirectory { get; set; }
     public string? StateDir { get; set; }
     public string? ConfigPath { get; set; }
@@ -35,6 +37,17 @@ public sealed class SeedUserOptions
     public string DisplayName { get; set; } = string.Empty;
     public string Department { get; set; } = "General";
     public string Role { get; set; } = nameof(UserRole.User);
+}
+
+public sealed class SeedDocumentOptions
+{
+    public string Title { get; set; } = string.Empty;
+    public string Department { get; set; } = "General";
+    public VisibilityScope Visibility { get; set; } = VisibilityScope.CommonShared;
+    public string Classification { get; set; } = "general";
+    public string RepositoryPathSegment { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
 }
 
 public interface IClock
@@ -146,7 +159,63 @@ public sealed class CatalogDocument
     public string Classification { get; init; } = string.Empty;
     public string RepositoryPath { get; init; } = string.Empty;
     public string Summary { get; init; } = string.Empty;
+    public string ExtractedText { get; init; } = string.Empty;
     public string? Suggestion { get; set; }
+}
+
+public sealed class RuntimePathProvider
+{
+    public string RepositoryRoot { get; }
+    public string StateRoot { get; }
+
+    public RuntimePathProvider(IOptions<AiCanOptions> options)
+    {
+        RepositoryRoot = ResolvePath(options.Value.RepositoryRoot, ".runtime/repository");
+        StateRoot = ResolvePath(options.Value.StateRoot, ".runtime/state");
+
+        Directory.CreateDirectory(RepositoryRoot);
+        Directory.CreateDirectory(StateRoot);
+    }
+
+    public string GetStateFile(string fileName) => Path.Combine(StateRoot, fileName);
+
+    private static string ResolvePath(string configuredPath, string fallbackPath)
+    {
+        var value = string.IsNullOrWhiteSpace(configuredPath) ? fallbackPath : configuredPath;
+        return Path.GetFullPath(value);
+    }
+}
+
+internal static class JsonStateFile
+{
+    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true
+    };
+
+    public static T LoadOrDefault<T>(string path, T fallback)
+    {
+        if (!File.Exists(path))
+        {
+            return fallback;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<T>(json, Options) ?? fallback;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    public static void Save<T>(string path, T value)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, JsonSerializer.Serialize(value, Options));
+    }
 }
 
 public sealed class SessionContextAccessor
@@ -159,10 +228,25 @@ public sealed class InMemoryUserDirectory : IUserDirectory
     private readonly ConcurrentDictionary<string, SessionExchangeResponse> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Guid> _userIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SeedUserOptions> _seedUsers;
+    private readonly string _userIdsPath;
+    private readonly string _sessionsPath;
+    private readonly object _sync = new();
 
-    public InMemoryUserDirectory(IOptions<AiCanOptions> options)
+    public InMemoryUserDirectory(IOptions<AiCanOptions> options, RuntimePathProvider paths)
     {
         _seedUsers = options.Value.SeedUsers.ToDictionary(x => x.Email, x => x, StringComparer.OrdinalIgnoreCase);
+        _userIdsPath = paths.GetStateFile("user-ids.json");
+        _sessionsPath = paths.GetStateFile("sessions.json");
+
+        foreach (var pair in JsonStateFile.LoadOrDefault(_userIdsPath, new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase)))
+        {
+            _userIds[pair.Key] = pair.Value;
+        }
+
+        foreach (var pair in JsonStateFile.LoadOrDefault(_sessionsPath, new Dictionary<string, SessionExchangeResponse>(StringComparer.OrdinalIgnoreCase)))
+        {
+            _sessions[pair.Key] = pair.Value;
+        }
     }
 
     public SessionExchangeResponse Exchange(SessionExchangeRequest request)
@@ -192,6 +276,7 @@ public sealed class InMemoryUserDirectory : IUserDirectory
             Convert.ToBase64String(Guid.NewGuid().ToByteArray()));
 
         _sessions[response.SessionToken] = response;
+        Persist();
         return response;
     }
 
@@ -210,11 +295,31 @@ public sealed class InMemoryUserDirectory : IUserDirectory
 
         return session;
     }
+
+    private void Persist()
+    {
+        lock (_sync)
+        {
+            JsonStateFile.Save(_userIdsPath, _userIds.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase));
+            JsonStateFile.Save(_sessionsPath, _sessions.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase));
+        }
+    }
 }
 
 public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
 {
     private readonly ConcurrentDictionary<Guid, AssistantProfileDto> _profiles = new();
+    private readonly string _profilesPath;
+    private readonly object _sync = new();
+
+    public InMemoryAssistantProfileStore(RuntimePathProvider paths)
+    {
+        _profilesPath = paths.GetStateFile("profiles.json");
+        foreach (var pair in JsonStateFile.LoadOrDefault(_profilesPath, new Dictionary<Guid, AssistantProfileDto>()))
+        {
+            _profiles[pair.Key] = pair.Value;
+        }
+    }
 
     public void UpsertFromSession(SessionExchangeResponse session, SessionExchangeRequest request)
     {
@@ -236,13 +341,15 @@ public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
                 DisplayName = session.DisplayName,
                 Department = session.Department
             });
+
+        Persist();
     }
 
     public AssistantProfileDto? Get(Guid userId) => _profiles.TryGetValue(userId, out var profile) ? profile : null;
 
     public AssistantProfileDto Update(Guid userId, UpdateAssistantProfileRequest update)
     {
-        return _profiles.AddOrUpdate(
+        var profile = _profiles.AddOrUpdate(
             userId,
             _ => throw new KeyNotFoundException("Profile does not exist."),
             (_, existing) => existing with
@@ -252,12 +359,34 @@ public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
                 WorkStyle = update.WorkStyle,
                 PreferredLanguage = update.PreferredLanguage
             });
+
+        Persist();
+        return profile;
+    }
+
+    private void Persist()
+    {
+        lock (_sync)
+        {
+            JsonStateFile.Save(_profilesPath, _profiles.ToDictionary(x => x.Key, x => x.Value));
+        }
     }
 }
 
 public sealed class InMemoryConversationStore : IConversationStore
 {
     private readonly ConcurrentDictionary<Guid, List<HistoryMessageDto>> _messages = new();
+    private readonly string _messagesPath;
+    private readonly object _sync = new();
+
+    public InMemoryConversationStore(RuntimePathProvider paths)
+    {
+        _messagesPath = paths.GetStateFile("conversations.json");
+        foreach (var pair in JsonStateFile.LoadOrDefault(_messagesPath, new Dictionary<Guid, List<HistoryMessageDto>>()))
+        {
+            _messages[pair.Key] = pair.Value;
+        }
+    }
 
     public IReadOnlyList<HistoryMessageDto> GetHistory(Guid userId)
     {
@@ -273,16 +402,40 @@ public sealed class InMemoryConversationStore : IConversationStore
         {
             list.Add(new HistoryMessageDto(Guid.NewGuid(), userId, role, content, DateTimeOffset.UtcNow));
         }
+
+        Persist();
+    }
+
+    private void Persist()
+    {
+        lock (_sync)
+        {
+            JsonStateFile.Save(_messagesPath, _messages.ToDictionary(x => x.Key, x => x.Value));
+        }
     }
 }
 
 public sealed class InMemoryDocumentCatalog : IDocumentCatalog
 {
     private readonly ConcurrentDictionary<Guid, CatalogDocument> _documents = new();
+    private readonly string _documentsPath;
+    private readonly object _sync = new();
+
+    public InMemoryDocumentCatalog(IOptions<AiCanOptions> options, RuntimePathProvider paths)
+    {
+        _documentsPath = paths.GetStateFile("documents.json");
+        foreach (var document in JsonStateFile.LoadOrDefault(_documentsPath, new List<CatalogDocument>()))
+        {
+            _documents[document.Id] = document;
+        }
+
+        SeedDocuments(options.Value.SeedDocuments, paths);
+    }
 
     public CatalogDocument Add(CatalogDocument document)
     {
         _documents[document.Id] = document;
+        Persist();
         return document;
     }
 
@@ -293,36 +446,134 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         if (_documents.TryGetValue(documentId, out var existing))
         {
             existing.Suggestion = $"{category}: {reason}";
+            Persist();
         }
     }
 
     public IReadOnlyList<CatalogDocument> Search(Guid userId, string department, string query)
     {
+        var terms = query
+            .Split(new[] { ' ', '\t', '\r', '\n', ',', '.', '?', '!', ':', ';', '-', '_', '/' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(term => term.Trim().ToLowerInvariant())
+            .Where(term => term.Length >= 3)
+            .Distinct()
+            .ToArray();
+
         return _documents.Values
-            .Where(document =>
-                document.Title.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                document.Summary.Contains(query, StringComparison.OrdinalIgnoreCase) ||
-                document.Classification.Contains(query, StringComparison.OrdinalIgnoreCase))
-            .Where(document => document.Visibility switch
+            .Select(document => new
             {
-                VisibilityScope.Private => document.OwnerUserId == userId,
-                VisibilityScope.DepartmentShared => string.Equals(document.Department, department, StringComparison.OrdinalIgnoreCase),
+                Document = document,
+                Score = Score(document, query, terms)
+            })
+            .Where(x => x.Score > 0)
+            .Where(document => document.Document.Visibility switch
+            {
+                VisibilityScope.Private => document.Document.OwnerUserId == userId,
+                VisibilityScope.DepartmentShared => string.Equals(document.Document.Department, department, StringComparison.OrdinalIgnoreCase),
                 VisibilityScope.CommonShared => true,
                 _ => false
             })
-            .OrderBy(document => document.Title)
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.Document.Title)
             .Take(5)
+            .Select(x => x.Document)
             .ToList();
+    }
+
+    private void SeedDocuments(IEnumerable<SeedDocumentOptions> seeds, RuntimePathProvider paths)
+    {
+        var changed = false;
+        foreach (var seed in seeds)
+        {
+            if (_documents.Values.Any(document =>
+                string.Equals(document.Title, seed.Title, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(document.RepositoryPath, Path.Combine(paths.RepositoryRoot, seed.RepositoryPathSegment).Replace('\\', '/'), StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            var repositoryPath = Path.Combine(paths.RepositoryRoot, seed.RepositoryPathSegment);
+            Directory.CreateDirectory(Path.GetDirectoryName(repositoryPath)!);
+
+            if (!string.IsNullOrWhiteSpace(seed.Content) && !File.Exists(repositoryPath))
+            {
+                File.WriteAllText(repositoryPath, seed.Content);
+            }
+
+            var document = new CatalogDocument
+            {
+                Id = Guid.NewGuid(),
+                OwnerUserId = Guid.Empty,
+                Title = seed.Title,
+                Department = seed.Department,
+                Visibility = seed.Visibility,
+                Classification = seed.Classification,
+                RepositoryPath = repositoryPath.Replace('\\', '/'),
+                Summary = seed.Summary,
+                ExtractedText = string.IsNullOrWhiteSpace(seed.Content) ? seed.Summary : seed.Content
+            };
+
+            _documents[document.Id] = document;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            Persist();
+        }
+    }
+
+    private void Persist()
+    {
+        lock (_sync)
+        {
+            JsonStateFile.Save(_documentsPath, _documents.Values.OrderBy(x => x.Title).ToList());
+        }
+    }
+
+    private static int Score(CatalogDocument document, string query, IReadOnlyList<string> terms)
+    {
+        var haystack = $"{document.Title} {document.Summary} {document.Classification} {document.ExtractedText}".ToLowerInvariant();
+        var loweredQuery = query.ToLowerInvariant();
+        var score = 0;
+
+        if (haystack.Contains(loweredQuery, StringComparison.Ordinal))
+        {
+            score += 8;
+        }
+
+        foreach (var term in terms)
+        {
+            if (haystack.Contains(term, StringComparison.Ordinal))
+            {
+                score += 3;
+            }
+        }
+
+        return score;
     }
 }
 
 public sealed class InMemoryAuditLog : IAuditLog
 {
     private readonly ConcurrentQueue<string> _entries = new();
+    private readonly string _auditPath;
+    private readonly object _sync = new();
+
+    public InMemoryAuditLog(RuntimePathProvider paths)
+    {
+        _auditPath = paths.GetStateFile("audit.log");
+    }
 
     public void Write(Guid actorId, string action, string target, DateTimeOffset occurredAtUtc)
     {
-        _entries.Enqueue($"{occurredAtUtc:O}|{actorId}|{action}|{target}");
+        var entry = $"{occurredAtUtc:O}|{actorId}|{action}|{target}";
+        _entries.Enqueue(entry);
+        lock (_sync)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_auditPath)!);
+            File.AppendAllLines(_auditPath, [entry]);
+        }
     }
 }
 
@@ -351,9 +602,12 @@ public sealed class FilingClassificationService : IClassificationService
         var category = request.DeclaredCategory;
         if (string.IsNullOrWhiteSpace(category))
         {
-            category = request.FileName.Contains("invoice", StringComparison.OrdinalIgnoreCase)
+            var corpus = $"{request.FileName} {request.ExtractedText}";
+            category = corpus.Contains("invoice", StringComparison.OrdinalIgnoreCase)
                 ? "invoice"
-                : request.FileName.Contains("hr", StringComparison.OrdinalIgnoreCase)
+                : corpus.Contains("printer", StringComparison.OrdinalIgnoreCase) || corpus.Contains("purchase", StringComparison.OrdinalIgnoreCase)
+                    ? "procurement"
+                    : corpus.Contains("hr", StringComparison.OrdinalIgnoreCase) || corpus.Contains("employee", StringComparison.OrdinalIgnoreCase)
                     ? "hr"
                     : "general";
         }
@@ -375,6 +629,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
     private readonly IVectorStore _vectorStore;
     private readonly IDocumentCatalog _catalog;
     private readonly IOptions<AiCanOptions> _options;
+    private readonly RuntimePathProvider _paths;
     private readonly IClock _clock;
 
     public DocumentIntakeService(
@@ -383,6 +638,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         IVectorStore vectorStore,
         IDocumentCatalog catalog,
         IOptions<AiCanOptions> options,
+        RuntimePathProvider paths,
         IClock clock)
     {
         _classification = classification;
@@ -390,6 +646,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         _vectorStore = vectorStore;
         _catalog = catalog;
         _options = options;
+        _paths = paths;
         _clock = clock;
     }
 
@@ -397,25 +654,86 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
     {
         var classification = _classification.Classify(request);
         var documentId = Guid.NewGuid();
-        var repositoryPath = Path.Combine(_options.Value.RepositoryRoot, classification.RepositoryPathSegment, request.FileName).Replace('\\', '/');
-        var summary = $"Registered {request.FileName} for {classification.CustomerName} in {classification.Category}.";
+        var fileName = Path.GetFileName(string.IsNullOrWhiteSpace(request.FileName) ? "document.bin" : request.FileName);
+        var repositoryPath = Path.Combine(_paths.RepositoryRoot, classification.RepositoryPathSegment, fileName);
+        var extractedText = BuildExtractedText(request, fileName);
+        var summary = BuildSummary(fileName, classification, extractedText);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(repositoryPath)!);
+        PersistBinary(repositoryPath, request);
 
         _catalog.Add(new CatalogDocument
         {
             Id = documentId,
             OwnerUserId = session.UserId,
-            Title = request.FileName,
+            Title = fileName,
             Department = request.Department,
             Visibility = request.Visibility,
             Classification = classification.Category,
-            RepositoryPath = repositoryPath,
-            Summary = summary
+            RepositoryPath = repositoryPath.Replace('\\', '/'),
+            Summary = summary,
+            ExtractedText = extractedText
         });
 
-        var vector = await _embeddings.EmbedAsync($"{request.FileName} {classification.Category} {classification.CustomerName}", cancellationToken);
+        var vector = await _embeddings.EmbedAsync($"{fileName} {classification.Category} {classification.CustomerName} {extractedText}", cancellationToken);
         await _vectorStore.UpsertAsync(documentId, vector, cancellationToken);
 
-        return new IntakeRegisterResponse(documentId, repositoryPath, classification.Category, request.Visibility, _clock.UtcNow);
+        return new IntakeRegisterResponse(documentId, repositoryPath.Replace('\\', '/'), classification.Category, request.Visibility, _clock.UtcNow);
+    }
+
+    private static string BuildExtractedText(IntakeRegisterRequest request, string fileName)
+    {
+        if (!string.IsNullOrWhiteSpace(request.ExtractedText))
+        {
+            return request.ExtractedText;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FileContentBase64))
+        {
+            try
+            {
+                var bytes = Convert.FromBase64String(request.FileContentBase64);
+                var extension = Path.GetExtension(fileName).ToLowerInvariant();
+                if (extension is ".txt" or ".md" or ".csv" or ".json")
+                {
+                    return Encoding.UTF8.GetString(bytes);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        return $"Registered file {fileName} from {request.OriginalFilePath}.";
+    }
+
+    private static string BuildSummary(string fileName, ClassificationResult classification, string extractedText)
+    {
+        var snippet = extractedText.Length > 160 ? extractedText[..160] + "..." : extractedText;
+        return $"{fileName} filed under {classification.Category} for {classification.CustomerName}. {snippet}".Trim();
+    }
+
+    private static void PersistBinary(string repositoryPath, IntakeRegisterRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.FileContentBase64))
+        {
+            try
+            {
+                File.WriteAllBytes(repositoryPath, Convert.FromBase64String(request.FileContentBase64));
+                return;
+            }
+            catch
+            {
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.OriginalFilePath) && File.Exists(request.OriginalFilePath))
+        {
+            File.Copy(request.OriginalFilePath, repositoryPath, overwrite: true);
+            return;
+        }
+
+        File.WriteAllText(repositoryPath, request.ExtractedText ?? string.Empty);
     }
 }
 
@@ -651,9 +969,28 @@ public sealed class OpenClawRunner : IOpenClawRunner
             throw new InvalidOperationException("OpenClaw process did not start.");
         }
 
-        var stdout = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var stderr = process.StandardError.ReadToEndAsync(cancellationToken);
-        await process.WaitForExitAsync(cancellationToken);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
+
+        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
+        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
+
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+            }
+
+            throw new TimeoutException($"OpenClaw exceeded the {_options.TimeoutSeconds}-second runtime limit.");
+        }
 
         var stdoutText = (await stdout).Trim();
         var stderrText = (await stderr).Trim();

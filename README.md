@@ -18,21 +18,21 @@ This scaffold implements the core v1 shape:
 - single-user bot profile with friendly preferences and private conversation history
 - central session exchange and role mapping
 - assistant chat endpoint with citations and low-risk suggested actions
-- document intake registration with governed repository path generation
-- watched-folder helper on the desktop client
+- document intake registration with governed repository path generation and binary upload support
+- watched-folder helper and manual upload flow on the desktop client
 - provider interfaces for LLM, embeddings, OCR, parsing, classification, and vector storage
 - OpenClaw runtime routing support with fallback to the built-in assistant
+- file-backed persistence for sessions, profiles, conversation history, document catalog state, and audit output
+- seeded demo tenant data and seeded demo documents for a live first-run walkthrough
 - document search endpoints and OpenClaw MCP tool exposure scaffolding
-
-The code intentionally uses in-memory stores for application state while keeping the boundaries needed to replace them with PostgreSQL, Qdrant, and persistent background jobs.
 
 ## Server configuration
 
 `src/AiCan.Api/appsettings.json` contains:
 
-- repository root
+- repository root and state root
 - LM Studio endpoint
-- seeded users and roles
+- seeded users, roles, and demo documents
 
 The API is written so the `ILLMProvider`, `IEmbeddingProvider`, and `IVectorStore` implementations can be swapped without changing the HTTP surface.
 
@@ -50,6 +50,8 @@ The API can use OpenClaw as the employee-facing assistant runtime.
 
 When OpenClaw mode is enabled, `/assistant/chat` shells out to `openclaw agent` and falls back to the built-in orchestrator if OpenClaw is unavailable.
 
+OpenClaw is also wrapped with a server-side wall-clock timeout so the desktop chat experience does not hang indefinitely if the external bot runtime is slow.
+
 ## Project isolation
 
 The server runtime is intended to stay self-contained inside the project folder.
@@ -64,10 +66,23 @@ This avoids mixing AiCan runtime data with other projects on the same server.
 
 The WPF desktop client targets Windows and is designed to:
 
-- sign the user in through Microsoft 365 using MSAL
+- connect directly to the AiCan server for a demo-safe flow
+- optionally attempt Microsoft 365 sign-in once a real Entra app is configured
 - let the user name their bot and store preferences locally
+- restore recent chat history after reconnect
 - keep a watched folder active in the background
-- call the central server for profile, chat, and intake flows
+- support manual file upload for live demos
+- call the central server for profile, chat, history, and intake flows
+
+## Demo tenant
+
+The default seeded tenant uses the hypothetical domain `aican.com`.
+
+- `admin@aican.com`
+- `docadmin@aican.com`
+- `user@aican.com`
+
+The desktop client defaults to the `user@aican.com` demo profile and a named bot (`RafiBot`) so the first-run demo works without additional setup.
 
 ## Worker notes
 
@@ -90,6 +105,15 @@ The Python worker is a thin service boundary for:
 3. Point `AiCan.Api` at your LM Studio host.
 4. Build and install the Windows desktop app on the client machine.
 5. Run the Python worker where document enrichment jobs should execute.
+
+## First demo flow
+
+1. Start the Ubuntu helper scripts or equivalent services.
+2. Open the Windows desktop client.
+3. Confirm the server URL points to the Ubuntu API.
+4. Click `Connect Bot`.
+5. Use a starter prompt such as `When did we last purchase a printer?`
+6. Upload a text file or drop one into the watched folder and ask the bot about it.
 
 ## Ubuntu server helper scripts
 
@@ -116,10 +140,11 @@ For a real deployment on Ubuntu, create an ignored `src/AiCan.Api/appsettings.Lo
 - `AiCan:OpenClaw:Enabled` to `true`
 - `AiCan:OpenClaw:WorkingDirectory` to `/home/joyat/projects/aican`
 - `AiCan:OpenClaw:StateDir` to `/home/joyat/projects/aican/.openclaw`
+- optionally override `AiCan:RepositoryRoot` and `AiCan:StateRoot` if you want the stored documents and persisted app state outside the project tree
 
-## Prototype limitations
+## Current limitations
 
-- persistence is in-memory inside the API process
 - email ingestion is not implemented yet
 - OAuth app registration values must be supplied for real Microsoft 365 sign-in
 - the worker exposes extraction/classification primitives but is not yet wired to an async job queue
+- the current vector store and database services are scaffolded but not yet used as the authoritative persistent source of truth

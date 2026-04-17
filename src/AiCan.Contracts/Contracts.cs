@@ -95,7 +95,9 @@ public sealed record IntakeRegisterRequest(
     VisibilityScope Visibility,
     string? DeclaredCategory,
     string? OwnerEmail,
-    string? CustomerName);
+    string? CustomerName,
+    string? FileContentBase64,
+    string? ExtractedText);
 
 public sealed record IntakeRegisterResponse(
     Guid DocumentId,

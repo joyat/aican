@@ -1,6 +1,5 @@
 using System.IO;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -21,13 +20,33 @@ public sealed record DesktopCacheState(
 
 public sealed record M365AuthResult(string AccessToken);
 
+public sealed record ApiHealthResponse(string Status);
+
+public static class DemoDefaults
+{
+    public const string ServerUrl = "http://100.97.72.86:5000";
+    public const string Email = "user@aican.com";
+    public const string DisplayName = "Nadia Islam";
+    public const string BotName = "RafiBot";
+    public const string Department = "Finance";
+    public const string PreferredLanguage = "en";
+}
+
 public sealed class M365AuthService
 {
-    private const string ClientId = "00000000-0000-0000-0000-000000000000";
+    private const string PlaceholderClientId = "00000000-0000-0000-0000-000000000000";
+    private const string ClientId = PlaceholderClientId;
     private static readonly string[] Scopes = ["User.Read"];
+
+    public bool IsConfigured => !string.Equals(ClientId, PlaceholderClientId, StringComparison.Ordinal);
 
     public async Task<M365AuthResult> AcquireAsync(string loginHint)
     {
+        if (!IsConfigured)
+        {
+            throw new InvalidOperationException("Microsoft 365 sign-in is not configured in this demo build. Use Connect Bot for the local demo flow.");
+        }
+
         var application = PublicClientApplicationBuilder
             .Create(ClientId)
             .WithDefaultRedirectUri()
@@ -43,7 +62,16 @@ public sealed class M365AuthService
 
 public sealed class DesktopApiClient
 {
-    private readonly HttpClient _httpClient = new();
+    private readonly HttpClient _httpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(45)
+    };
+
+    public async Task<bool> GetHealthAsync(string serverUrl)
+    {
+        var response = await _httpClient.GetAsync($"{serverUrl.TrimEnd('/')}/healthz");
+        return response.IsSuccessStatusCode;
+    }
 
     public async Task<SessionExchangeResponse> ExchangeSessionAsync(string serverUrl, SessionExchangeRequest request)
     {
@@ -56,25 +84,23 @@ public sealed class DesktopApiClient
 
     public async Task<AssistantProfileDto> UpdateProfileAsync(string serverUrl, string sessionToken, UpdateAssistantProfileRequest request)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Patch, $"{serverUrl.TrimEnd('/')}/assistant/profile")
-        {
-            Content = JsonContent.Create(request)
-        };
-        message.Headers.Add("X-AiCan-Session", sessionToken);
-
+        using var message = CreateAuthorized(HttpMethod.Patch, $"{serverUrl.TrimEnd('/')}/assistant/profile", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<AssistantProfileDto>() ?? throw new InvalidOperationException("Missing profile response.");
     }
 
+    public async Task<IReadOnlyList<HistoryMessageDto>> GetHistoryAsync(string serverUrl, string sessionToken)
+    {
+        using var message = CreateAuthorized(HttpMethod.Get, $"{serverUrl.TrimEnd('/')}/assistant/history", sessionToken);
+        using var response = await _httpClient.SendAsync(message);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<HistoryMessageDto>>() ?? Array.Empty<HistoryMessageDto>();
+    }
+
     public async Task<ChatResponse> ChatAsync(string serverUrl, string sessionToken, ChatRequest request)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/assistant/chat")
-        {
-            Content = JsonContent.Create(request)
-        };
-        message.Headers.Add("X-AiCan-Session", sessionToken);
-
+        using var message = CreateAuthorized(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/assistant/chat", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<ChatResponse>() ?? throw new InvalidOperationException("Missing chat response.");
@@ -82,15 +108,24 @@ public sealed class DesktopApiClient
 
     public async Task<IntakeRegisterResponse> RegisterFileAsync(string serverUrl, string sessionToken, IntakeRegisterRequest request)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/documents/intake/register")
-        {
-            Content = JsonContent.Create(request)
-        };
-        message.Headers.Add("X-AiCan-Session", sessionToken);
-
+        using var message = CreateAuthorized(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/documents/intake/register", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<IntakeRegisterResponse>() ?? throw new InvalidOperationException("Missing intake response.");
+    }
+
+    private static HttpRequestMessage CreateAuthorized<T>(HttpMethod method, string url, string sessionToken, T payload)
+    {
+        var message = CreateAuthorized(method, url, sessionToken);
+        message.Content = JsonContent.Create(payload);
+        return message;
+    }
+
+    private static HttpRequestMessage CreateAuthorized(HttpMethod method, string url, string sessionToken)
+    {
+        var message = new HttpRequestMessage(method, url);
+        message.Headers.Add("X-AiCan-Session", sessionToken);
+        return message;
     }
 }
 
@@ -100,15 +135,23 @@ public sealed class FolderWatcherService : IDisposable
     private readonly string _serverUrl;
     private readonly string _sessionToken;
     private readonly string _department;
+    private readonly string _ownerEmail;
     private readonly string _folderPath;
     private readonly Action<string> _status;
     private FileSystemWatcher? _watcher;
 
-    public FolderWatcherService(string serverUrl, string sessionToken, string department, string folderPath, Action<string> status)
+    public FolderWatcherService(
+        string serverUrl,
+        string sessionToken,
+        string department,
+        string ownerEmail,
+        string folderPath,
+        Action<string> status)
     {
         _serverUrl = serverUrl;
         _sessionToken = sessionToken;
         _department = department;
+        _ownerEmail = ownerEmail;
         _folderPath = folderPath;
         _status = status;
     }
@@ -129,15 +172,8 @@ public sealed class FolderWatcherService : IDisposable
     {
         try
         {
-            var request = new IntakeRegisterRequest(
-                e.FullPath,
-                Path.GetFileName(e.FullPath),
-                _department,
-                VisibilityScope.Private,
-                null,
-                null,
-                null);
-
+            await Task.Delay(900);
+            var request = await DesktopFileRequestBuilder.CreateAsync(e.FullPath, _department, _ownerEmail, VisibilityScope.Private);
             var response = await _client.RegisterFileAsync(_serverUrl, _sessionToken, request);
             _status($"Registered {request.FileName} to {response.RepositoryPath}");
         }
@@ -154,6 +190,80 @@ public sealed class FolderWatcherService : IDisposable
             _watcher.Created -= OnCreated;
             _watcher.Dispose();
         }
+    }
+}
+
+public static class DesktopFileRequestBuilder
+{
+    private const int MaxInlineBytes = 5 * 1024 * 1024;
+
+    public static async Task<IntakeRegisterRequest> CreateAsync(
+        string filePath,
+        string department,
+        string ownerEmail,
+        VisibilityScope visibility,
+        string? declaredCategory = null,
+        string? customerName = null)
+    {
+        var safeFileName = Path.GetFileName(filePath);
+        var fileInfo = new FileInfo(filePath);
+        string? base64 = null;
+        if (fileInfo.Exists && fileInfo.Length <= MaxInlineBytes)
+        {
+            base64 = Convert.ToBase64String(await ReadAllBytesWithRetryAsync(filePath));
+        }
+
+        var extractedText = await TryExtractTextAsync(filePath);
+        return new IntakeRegisterRequest(
+            filePath,
+            safeFileName,
+            department,
+            visibility,
+            declaredCategory,
+            ownerEmail,
+            customerName,
+            base64,
+            extractedText);
+    }
+
+    private static async Task<byte[]> ReadAllBytesWithRetryAsync(string path)
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try
+            {
+                return await File.ReadAllBytesAsync(path);
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                await Task.Delay(400);
+            }
+        }
+
+        return await File.ReadAllBytesAsync(path);
+    }
+
+    private static async Task<string?> TryExtractTextAsync(string path)
+    {
+        var extension = Path.GetExtension(path).ToLowerInvariant();
+        if (extension is not (".txt" or ".md" or ".csv" or ".json"))
+        {
+            return null;
+        }
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            try
+            {
+                return await File.ReadAllTextAsync(path, Encoding.UTF8);
+            }
+            catch (IOException) when (attempt < 4)
+            {
+                await Task.Delay(400);
+            }
+        }
+
+        return null;
     }
 }
 
