@@ -3,13 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
   <Application.Resources>
-    <Color x:Key="AiCanInkColor">#14213D</Color>
-    <Color x:Key="AiCanSlateColor">#4B5D7A</Color>
-    <Color x:Key="AiCanCloudColor">#F4F7FB</Color>
-    <Color x:Key="AiCanMintColor">#D8F3E6</Color>
-    <Color x:Key="AiCanGoldColor">#F5C451</Color>
-    <Color x:Key="AiCanTealColor">#2C7A7B</Color>
-    <Color x:Key="AiCanRoseColor">#FFF1E8</Color>
+    <Color x:Key="AiCanInkColor">#0F1B37</Color>
+    <Color x:Key="AiCanSlateColor">#61728F</Color>
+    <Color x:Key="AiCanCloudColor">#EEF4FB</Color>
+    <Color x:Key="AiCanMintColor">#D7F3EA</Color>
+    <Color x:Key="AiCanGoldColor">#F4C95B</Color>
+    <Color x:Key="AiCanTealColor">#2A8C82</Color>
+    <Color x:Key="AiCanRoseColor">#FCEBDD</Color>
+    <Color x:Key="AiCanGlassColor">#CCFFFFFF</Color>
+    <Color x:Key="AiCanNavyGlassColor">#B315294A</Color>
 
     <SolidColorBrush x:Key="AiCanInkBrush" Color="{StaticResource AiCanInkColor}" />
     <SolidColorBrush x:Key="AiCanSlateBrush" Color="{StaticResource AiCanSlateColor}" />
@@ -18,28 +20,29 @@
     <SolidColorBrush x:Key="AiCanGoldBrush" Color="{StaticResource AiCanGoldColor}" />
     <SolidColorBrush x:Key="AiCanTealBrush" Color="{StaticResource AiCanTealColor}" />
     <SolidColorBrush x:Key="AiCanRoseBrush" Color="{StaticResource AiCanRoseColor}" />
+    <SolidColorBrush x:Key="AiCanGlassBrush" Color="{StaticResource AiCanGlassColor}" />
+    <SolidColorBrush x:Key="AiCanNavyGlassBrush" Color="{StaticResource AiCanNavyGlassColor}" />
 
     <Style TargetType="Window">
       <Setter Property="FontFamily" Value="Bahnschrift" />
-      <Setter Property="Background" Value="{StaticResource AiCanCloudBrush}" />
+      <Setter Property="Background">
+        <Setter.Value>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+            <GradientStop Color="#F4FAFF" Offset="0" />
+            <GradientStop Color="#DCEBFA" Offset="0.45" />
+            <GradientStop Color="#C7D8EE" Offset="1" />
+          </LinearGradientBrush>
+        </Setter.Value>
+      </Setter>
       <Setter Property="Foreground" Value="{StaticResource AiCanInkBrush}" />
     </Style>
 
     <Style TargetType="TextBox">
-      <Setter Property="Background" Value="White" />
+      <Setter Property="Background" Value="#F9FBFE" />
       <Setter Property="Foreground" Value="{StaticResource AiCanInkBrush}" />
-      <Setter Property="BorderBrush" Value="#D9E2EE" />
+      <Setter Property="BorderBrush" Value="#D7E1EF" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Padding" Value="12,10" />
-      <Setter Property="Margin" Value="0,6,0,12" />
-    </Style>
-
-    <Style TargetType="ComboBox">
-      <Setter Property="Background" Value="White" />
-      <Setter Property="Foreground" Value="{StaticResource AiCanInkBrush}" />
-      <Setter Property="BorderBrush" Value="#D9E2EE" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="8,6" />
       <Setter Property="Margin" Value="0,6,0,12" />
     </Style>
 
@@ -63,8 +66,40 @@
     <Style x:Key="PromptButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
       <Setter Property="Margin" Value="0,0,8,8" />
       <Setter Property="Padding" Value="14,8" />
-      <Setter Property="Background" Value="#FFFDF8" />
-      <Setter Property="BorderBrush" Value="#E6DCC4" />
+      <Setter Property="Background" Value="#1C355E" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderBrush" Value="#375C91" />
+    </Style>
+
+    <Style x:Key="RibbonRadioStyle" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Margin" Value="0,0,8,8" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="Chip"
+                    Padding="14,8"
+                    Background="#193156"
+                    BorderBrush="#456388"
+                    BorderThickness="1"
+                    CornerRadius="16">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Chip" Property="Background" Value="#F4C95B" />
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#E7B126" />
+                <Setter Property="Foreground" Value="#0F1B37" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Chip" Property="BorderBrush" Value="#8FB1D9" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
   </Application.Resources>
 </Application>

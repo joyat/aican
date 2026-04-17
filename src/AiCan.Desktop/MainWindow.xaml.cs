@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -23,14 +24,23 @@ public sealed class ConversationEntry
 
 public partial class MainWindow : Window
 {
-    private static readonly Brush AssistantBubble = new SolidColorBrush(Color.FromRgb(236, 248, 244));
-    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(148, 208, 184));
-    private static readonly Brush UserBubble = new SolidColorBrush(Color.FromRgb(245, 196, 81));
-    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(231, 177, 38));
-    private static readonly Brush SystemBubble = new SolidColorBrush(Color.FromRgb(22, 42, 71));
-    private static readonly Brush SystemBorder = new SolidColorBrush(Color.FromRgb(60, 92, 138));
-    private static readonly Brush DarkInk = new SolidColorBrush(Color.FromRgb(20, 33, 61));
-    private static readonly Brush SoftMeta = new SolidColorBrush(Color.FromRgb(181, 199, 222));
+    private enum PresenceState
+    {
+        Offline,
+        Ready,
+        Busy,
+        Watch,
+        Error
+    }
+
+    private static readonly Brush AssistantBubble = new SolidColorBrush(Color.FromRgb(233, 247, 242));
+    private static readonly Brush AssistantBorder = new SolidColorBrush(Color.FromRgb(133, 201, 179));
+    private static readonly Brush UserBubble = new SolidColorBrush(Color.FromRgb(244, 201, 91));
+    private static readonly Brush UserBorder = new SolidColorBrush(Color.FromRgb(228, 177, 37));
+    private static readonly Brush SystemBubble = new SolidColorBrush(Color.FromRgb(22, 46, 82));
+    private static readonly Brush SystemBorder = new SolidColorBrush(Color.FromRgb(61, 97, 142));
+    private static readonly Brush DarkInk = new SolidColorBrush(Color.FromRgb(15, 27, 55));
+    private static readonly Brush SoftMeta = new SolidColorBrush(Color.FromRgb(184, 202, 226));
     private static readonly Brush LightText = Brushes.White;
 
     private readonly DesktopApiClient _apiClient = new();
@@ -39,6 +49,7 @@ public partial class MainWindow : Window
     private FolderWatcherService? _watcher;
     private SessionExchangeResponse? _session;
     private bool _isBusy;
+    private bool _watcherActive;
 
     public MainWindow()
     {
@@ -49,7 +60,8 @@ public partial class MainWindow : Window
         LoadCachedState();
         RefreshBotIdentity();
         SetStatus("Connect the bot to begin.");
-        AddSystemMessage("AiCan is ready. Connect a demo user or use Microsoft 365 if a real Entra app has been configured.");
+        SetPresence(PresenceState.Offline);
+        AddSystemMessage("AiCan is ready. Connect JoBot and start from the quick starters.");
         RefreshActionState();
     }
 
@@ -57,8 +69,6 @@ public partial class MainWindow : Window
     {
         BotNameTextBox.TextChanged += (_, _) => RefreshBotIdentity();
         DisplayNameTextBox.TextChanged += (_, _) => RefreshBotIdentity();
-        ToneComboBox.SelectionChanged += (_, _) => RefreshBotIdentity();
-        WorkStyleComboBox.SelectionChanged += (_, _) => RefreshBotIdentity();
     }
 
     private void LoadCachedState()
@@ -66,12 +76,13 @@ public partial class MainWindow : Window
         var settings = _cache.Load();
         ServerUrlTextBox.Text = settings?.ServerUrl ?? DemoDefaults.ServerUrl;
         EmailTextBox.Text = settings?.Email ?? DemoDefaults.Email;
-        DisplayNameTextBox.Text = settings?.DisplayName ?? DemoDefaults.DisplayName;
-        BotNameTextBox.Text = settings?.BotName ?? DemoDefaults.BotName;
+        DisplayNameTextBox.Text = NormalizeDisplayName(settings?.DisplayName);
+        BotNameTextBox.Text = NormalizeBotName(settings?.BotName);
         DepartmentTextBox.Text = settings?.Department ?? DemoDefaults.Department;
-        LanguageTextBox.Text = settings?.PreferredLanguage ?? DemoDefaults.PreferredLanguage;
         WatchedFolderTextBox.Text = settings?.WatchedFolder
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AiCan", "Inbox");
+
+        SetLanguage(settings?.PreferredLanguage ?? DemoDefaults.PreferredLanguage);
     }
 
     private async void ConnectButton_Click(object sender, RoutedEventArgs e)
@@ -90,7 +101,7 @@ public partial class MainWindow : Window
         {
             SetBusy(true, useM365 ? "Starting Microsoft 365 sign-in..." : "Checking server connection...");
 
-            if (!await _apiClient.GetHealthAsync(ServerUrlTextBox.Text))
+            if (!await _apiClient.GetHealthAsync(ServerUrlTextBox.Text.Trim()))
             {
                 throw new InvalidOperationException("The AiCan server is not reachable. Check the URL and network path first.");
             }
@@ -99,12 +110,12 @@ public partial class MainWindow : Window
             if (useM365)
             {
                 var authService = new M365AuthService();
-                var authResult = await authService.AcquireAsync(EmailTextBox.Text);
+                var authResult = await authService.AcquireAsync(EmailTextBox.Text.Trim());
                 accessToken = authResult.AccessToken;
             }
 
             _session = await _apiClient.ExchangeSessionAsync(
-                ServerUrlTextBox.Text,
+                ServerUrlTextBox.Text.Trim(),
                 new SessionExchangeRequest(
                     EmailTextBox.Text.Trim(),
                     DisplayNameTextBox.Text.Trim(),
@@ -115,14 +126,14 @@ public partial class MainWindow : Window
             await SaveProfileInternalAsync(emitTimelineEvent: false);
             await LoadHistoryAsync();
 
-            AddAssistantMessage(
-                $"{_session.BotName} is connected. I’ll stay within your authorized workspace and cite what I use.",
-                "Bot online");
+            AddAssistantMessage($"{CurrentBotName()} is connected. I’ll keep the tone personal, grounded, and within your authorized workspace.", "Bot online");
             SetStatus($"Connected as {_session.Email} in {_session.Department}. Role: {_session.Role}.");
+            SetPresence(_watcherActive ? PresenceState.Watch : PresenceState.Ready);
         }
         catch (Exception ex)
         {
             _session = null;
+            SetPresence(PresenceState.Error);
             AddSystemMessage($"Connection failed: {ex.Message}");
             SetStatus($"Connection failed: {ex.Message}");
         }
@@ -141,7 +152,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var history = await _apiClient.GetHistoryAsync(ServerUrlTextBox.Text, _session.SessionToken);
+        var history = await _apiClient.GetHistoryAsync(ServerUrlTextBox.Text.Trim(), _session.SessionToken);
         foreach (var item in history)
         {
             switch (item.Role)
@@ -160,7 +171,7 @@ public partial class MainWindow : Window
 
         if (_messages.Count == 0)
         {
-            AddSystemMessage("No prior conversation yet. Try one of the starter prompts above.");
+            AddSystemMessage("No prior conversation yet. Use a starter prompt or ask JoBot something directly.");
         }
     }
 
@@ -168,11 +179,12 @@ public partial class MainWindow : Window
     {
         try
         {
-            SetBusy(true, "Saving bot personality...");
+            SetBusy(true, "Applying personality ribbon...");
             await SaveProfileInternalAsync(emitTimelineEvent: true);
         }
         catch (Exception ex)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage($"Save failed: {ex.Message}");
             SetStatus($"Save failed: {ex.Message}");
         }
@@ -186,16 +198,16 @@ public partial class MainWindow : Window
     {
         if (_session is null)
         {
-            throw new InvalidOperationException("Connect the bot before saving the profile.");
+            throw new InvalidOperationException("Connect the bot before saving the personality.");
         }
 
         var update = new UpdateAssistantProfileRequest(
             BotNameTextBox.Text.Trim(),
-            SelectedText(ToneComboBox),
-            SelectedText(WorkStyleComboBox),
-            LanguageTextBox.Text.Trim());
+            SelectedTone(),
+            SelectedWorkStyle(),
+            SelectedLanguage());
 
-        var profile = await _apiClient.UpdateProfileAsync(ServerUrlTextBox.Text, _session.SessionToken, update);
+        var profile = await _apiClient.UpdateProfileAsync(ServerUrlTextBox.Text.Trim(), _session.SessionToken, update);
         _cache.Save(new DesktopCacheState(
             ServerUrlTextBox.Text.Trim(),
             EmailTextBox.Text.Trim(),
@@ -207,10 +219,10 @@ public partial class MainWindow : Window
 
         BotNameTextBox.Text = profile.BotName;
         RefreshBotIdentity();
-        SetStatus($"Profile saved for {profile.BotName}.");
+        SetStatus($"Personality applied for {profile.BotName}.");
         if (emitTimelineEvent)
         {
-            AddSystemMessage($"Saved personality settings for {profile.BotName}.");
+            AddSystemMessage($"Updated JoBot's ribbon settings: tone {SelectedTone()}, work style {SelectedWorkStyle()}, language {SelectedLanguage()}.");
         }
     }
 
@@ -218,6 +230,7 @@ public partial class MainWindow : Window
     {
         if (_session is null)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage("Connect the bot before enabling the watcher.");
             SetStatus("Connect the bot before enabling the watcher.");
             return;
@@ -232,11 +245,15 @@ public partial class MainWindow : Window
             WatchedFolderTextBox.Text.Trim(),
             message => Dispatcher.Invoke(() =>
             {
+                _watcherActive = true;
+                SetPresence(PresenceState.Watch);
                 AddSystemMessage(message);
                 SetStatus(message);
             }));
 
         _watcher.Start();
+        _watcherActive = true;
+        SetPresence(PresenceState.Watch);
         AddSystemMessage($"Watching {WatchedFolderTextBox.Text.Trim()} for new files.");
         SetStatus($"Watching {WatchedFolderTextBox.Text.Trim()}.");
     }
@@ -245,6 +262,7 @@ public partial class MainWindow : Window
     {
         if (_session is null)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage("Connect the bot before uploading files.");
             SetStatus("Connect the bot before uploading files.");
             return;
@@ -274,9 +292,11 @@ public partial class MainWindow : Window
             var message = $"Uploaded {request.FileName} to {response.RepositoryPath}.";
             AddSystemMessage(message);
             SetStatus(message);
+            SetPresence(_watcherActive ? PresenceState.Watch : PresenceState.Ready);
         }
         catch (Exception ex)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage($"Upload failed: {ex.Message}");
             SetStatus($"Upload failed: {ex.Message}");
         }
@@ -306,6 +326,7 @@ public partial class MainWindow : Window
     {
         if (_session is null)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage("Connect the bot before sending messages.");
             SetStatus("Connect the bot before sending messages.");
             return;
@@ -319,21 +340,36 @@ public partial class MainWindow : Window
 
         try
         {
-            SetBusy(true, "RafiBot is thinking...");
+            SetBusy(true, $"{CurrentBotName()} is thinking...");
             AddUserMessage(userMessage, "You");
             MessageTextBox.Clear();
 
             var response = await _apiClient.ChatAsync(ServerUrlTextBox.Text.Trim(), _session.SessionToken, new ChatRequest(userMessage));
-            AddAssistantMessage(response.Message, BotNameTextBox.Text.Trim());
+            AddAssistantMessage(response.Message, CurrentBotName());
             foreach (var citation in response.Citations)
             {
                 AddSystemMessage($"Citation: {citation.Title} -> {citation.RepositoryPath}");
             }
 
-            SetStatus($"Last reply received from {BotNameTextBox.Text.Trim()}.");
+            SetStatus($"Last reply received from {CurrentBotName()}.");
+            SetPresence(_watcherActive ? PresenceState.Watch : PresenceState.Ready);
+        }
+        catch (TaskCanceledException)
+        {
+            SetPresence(PresenceState.Error);
+            var message = "Chat timed out before the assistant replied. The server path is reachable, but the bot runtime took too long.";
+            AddSystemMessage(message);
+            SetStatus(message);
+        }
+        catch (HttpRequestException ex)
+        {
+            SetPresence(PresenceState.Error);
+            AddSystemMessage($"Chat failed: {ex.Message}");
+            SetStatus($"Chat failed: {ex.Message}");
         }
         catch (Exception ex)
         {
+            SetPresence(PresenceState.Error);
             AddSystemMessage($"Chat failed: {ex.Message}");
             SetStatus($"Chat failed: {ex.Message}");
         }
@@ -343,15 +379,19 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RibbonChanged(object sender, RoutedEventArgs e)
+    {
+        RefreshBotIdentity();
+    }
+
     private void RefreshBotIdentity()
     {
-        var botName = string.IsNullOrWhiteSpace(BotNameTextBox.Text) ? DemoDefaults.BotName : BotNameTextBox.Text.Trim();
-        var displayName = string.IsNullOrWhiteSpace(DisplayNameTextBox.Text) ? DemoDefaults.DisplayName : DisplayNameTextBox.Text.Trim();
-
+        var botName = CurrentBotName();
+        var displayName = CurrentDisplayName();
         BotDisplayNameTextBlock.Text = botName;
         ConversationTitleTextBlock.Text = $"Talk to {botName}";
-        BotInitialsTextBlock.Text = string.Concat(botName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(part => char.ToUpperInvariant(part[0])));
-        BotMoodTextBlock.Text = $"{botName} supports {displayName} with a {SelectedText(ToneComboBox)} tone and {SelectedText(WorkStyleComboBox)} work style.";
+        BotInitialsTextBlock.Text = BuildInitials(botName);
+        BotMoodTextBlock.Text = $"{botName} supports {displayName} with a {SelectedTone()} tone and a {SelectedWorkStyle()} approach.";
     }
 
     private void SetBusy(bool isBusy, string? status = null)
@@ -360,6 +400,23 @@ public partial class MainWindow : Window
         if (!string.IsNullOrWhiteSpace(status))
         {
             SetStatus(status);
+        }
+
+        if (isBusy)
+        {
+            SetPresence(PresenceState.Busy);
+        }
+        else if (_session is null)
+        {
+            SetPresence(PresenceState.Offline);
+        }
+        else if (_watcherActive)
+        {
+            SetPresence(PresenceState.Watch);
+        }
+        else
+        {
+            SetPresence(PresenceState.Ready);
         }
 
         RefreshActionState();
@@ -371,11 +428,25 @@ public partial class MainWindow : Window
         SendButton.IsEnabled = connected && !_isBusy;
         ConnectButton.IsEnabled = !_isBusy;
         M365Button.IsEnabled = !_isBusy;
+        SaveRibbonButton.IsEnabled = connected && !_isBusy;
     }
 
     private void SetStatus(string message)
     {
         StatusTextBlock.Text = message;
+    }
+
+    private void SetPresence(PresenceState state)
+    {
+        (StatusWordTextBlock.Text, StatusLedEllipse.Fill) = state switch
+        {
+            PresenceState.Offline => ("OFFLINE", new SolidColorBrush(Color.FromRgb(127, 139, 152))),
+            PresenceState.Ready => ("READY", new SolidColorBrush(Color.FromRgb(74, 222, 128))),
+            PresenceState.Busy => ("BUSY", new SolidColorBrush(Color.FromRgb(244, 201, 91))),
+            PresenceState.Watch => ("WATCH", new SolidColorBrush(Color.FromRgb(78, 205, 196))),
+            PresenceState.Error => ("ERROR", new SolidColorBrush(Color.FromRgb(248, 113, 113))),
+            _ => ("READY", new SolidColorBrush(Color.FromRgb(74, 222, 128)))
+        };
     }
 
     private void AddUserMessage(string text, string meta)
@@ -399,7 +470,7 @@ public partial class MainWindow : Window
     {
         _messages.Add(new ConversationEntry
         {
-            Speaker = string.IsNullOrWhiteSpace(BotNameTextBox.Text) ? DemoDefaults.BotName : BotNameTextBox.Text.Trim(),
+            Speaker = CurrentBotName(),
             Text = text,
             Meta = meta,
             Alignment = HorizontalAlignment.Left,
@@ -437,8 +508,90 @@ public partial class MainWindow : Window
         }
     }
 
-    private static string SelectedText(ComboBox comboBox)
+    private string CurrentBotName()
     {
-        return (comboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? string.Empty;
+        return NormalizeBotName(BotNameTextBox.Text.Trim());
+    }
+
+    private string CurrentDisplayName()
+    {
+        return NormalizeDisplayName(DisplayNameTextBox.Text.Trim());
+    }
+
+    private string SelectedTone()
+    {
+        if (ToneDirectRadio.IsChecked == true)
+        {
+            return "DirectConcise";
+        }
+
+        if (ToneFormalRadio.IsChecked == true)
+        {
+            return "FormalBusiness";
+        }
+
+        return "WarmProfessional";
+    }
+
+    private string SelectedWorkStyle()
+    {
+        if (StyleDetailedRadio.IsChecked == true)
+        {
+            return "DetailedGuidance";
+        }
+
+        if (StyleTaskRadio.IsChecked == true)
+        {
+            return "TaskDriven";
+        }
+
+        return "HelpfulAndConcise";
+    }
+
+    private string SelectedLanguage()
+    {
+        return LanguageBanglaRadio.IsChecked == true ? "bn" : "en";
+    }
+
+    private void SetLanguage(string language)
+    {
+        if (string.Equals(language, "bn", StringComparison.OrdinalIgnoreCase))
+        {
+            LanguageBanglaRadio.IsChecked = true;
+            return;
+        }
+
+        LanguageEnglishRadio.IsChecked = true;
+    }
+
+    private static string NormalizeBotName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "RafiBot", StringComparison.OrdinalIgnoreCase))
+        {
+            return DemoDefaults.BotName;
+        }
+
+        return value.Trim();
+    }
+
+    private static string NormalizeDisplayName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "Nadia Islam", StringComparison.OrdinalIgnoreCase))
+        {
+            return DemoDefaults.DisplayName;
+        }
+
+        return value.Trim();
+    }
+
+    private static string BuildInitials(string value)
+    {
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0)
+        {
+            return "JB";
+        }
+
+        return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
 }

@@ -420,6 +420,12 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
     private readonly ConcurrentDictionary<Guid, CatalogDocument> _documents = new();
     private readonly string _documentsPath;
     private readonly object _sync = new();
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "the", "and", "are", "you", "your", "who", "what", "when", "where", "did",
+        "last", "show", "latest", "with", "from", "this", "that", "have", "about",
+        "can", "could", "for", "our", "his", "her", "their", "them", "into"
+    };
 
     public InMemoryDocumentCatalog(IOptions<AiCanOptions> options, RuntimePathProvider paths)
     {
@@ -456,6 +462,7 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
             .Split(new[] { ' ', '\t', '\r', '\n', ',', '.', '?', '!', ':', ';', '-', '_', '/' }, StringSplitOptions.RemoveEmptyEntries)
             .Select(term => term.Trim().ToLowerInvariant())
             .Where(term => term.Length >= 3)
+            .Where(term => !StopWords.Contains(term))
             .Distinct()
             .ToArray();
 
@@ -761,6 +768,15 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
         var profile = _profiles.Get(session.UserId) ?? throw new InvalidOperationException("Assistant profile is missing.");
         _conversations.Append(session.UserId, MessageRole.User, request.Message);
 
+        if (TryBuildInstantResponse(profile, request.Message, out var instantResponse))
+        {
+            _conversations.Append(session.UserId, MessageRole.Assistant, instantResponse);
+            return new ChatResponse(
+                instantResponse,
+                Array.Empty<CitationDto>(),
+                new[] { new SuggestedActionDto(SuggestedActionType.RequestAccess, "Request access to a library", null) });
+        }
+
         var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
         var context = citations.Count == 0
             ? "No authorized document citations were found."
@@ -784,6 +800,25 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
 
         var suggestedActions = BuildSuggestedActions(citations);
         return new ChatResponse(responseText, citations, suggestedActions);
+    }
+
+    private static bool TryBuildInstantResponse(AssistantProfileDto profile, string message, out string response)
+    {
+        var normalized = message.Trim().ToLowerInvariant();
+        if (normalized.Contains("who are you", StringComparison.Ordinal) || normalized.Contains("what are you", StringComparison.Ordinal))
+        {
+            response = $"I’m {profile.BotName}, your friendly workplace assistant for {profile.DisplayName}. I help with document-grounded answers, file intake, and day-to-day office questions while staying inside your authorized workspace.";
+            return true;
+        }
+
+        if (normalized is "hi" or "hello" or "hey")
+        {
+            response = $"Hello, I’m {profile.BotName}. I’m here and ready to help.";
+            return true;
+        }
+
+        response = string.Empty;
+        return false;
     }
 
     private static IReadOnlyList<SuggestedActionDto> BuildSuggestedActions(IReadOnlyList<CitationDto> citations)
@@ -811,20 +846,34 @@ public sealed class AssistantRuntimeRouter : IAssistantRuntime
     private readonly IOptions<AiCanOptions> _options;
     private readonly IAssistantOrchestrator _builtIn;
     private readonly OpenClawAssistantRuntime _openClaw;
+    private readonly IRetrievalService _retrieval;
 
     public AssistantRuntimeRouter(
         IOptions<AiCanOptions> options,
         IAssistantOrchestrator builtIn,
-        OpenClawAssistantRuntime openClaw)
+        OpenClawAssistantRuntime openClaw,
+        IRetrievalService retrieval)
     {
         _options = options;
         _builtIn = builtIn;
         _openClaw = openClaw;
+        _retrieval = retrieval;
     }
 
     public async Task<ChatResponse> RespondAsync(SessionExchangeResponse session, ChatRequest request, CancellationToken cancellationToken)
     {
         if (!_options.Value.OpenClaw.Enabled)
+        {
+            return await _builtIn.RespondAsync(session, request, cancellationToken);
+        }
+
+        if (ShouldUseBuiltInFastPath(request.Message))
+        {
+            return await _builtIn.RespondAsync(session, request, cancellationToken);
+        }
+
+        var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
+        if (citations.Count > 0)
         {
             return await _builtIn.RespondAsync(session, request, cancellationToken);
         }
@@ -837,6 +886,33 @@ public sealed class AssistantRuntimeRouter : IAssistantRuntime
         {
             return await _builtIn.RespondAsync(session, request, cancellationToken);
         }
+    }
+
+    private static bool ShouldUseBuiltInFastPath(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return true;
+        }
+
+        var normalized = message.Trim().ToLowerInvariant();
+        string[] fastPathPhrases =
+        [
+            "who are you",
+            "what are you",
+            "what can you do",
+            "introduce yourself",
+            "hello",
+            "hi",
+            "hey",
+            "are you there",
+            "thanks",
+            "thank you",
+            "good morning",
+            "good afternoon"
+        ];
+
+        return fastPathPhrases.Any(phrase => normalized.Contains(phrase, StringComparison.Ordinal));
     }
 }
 

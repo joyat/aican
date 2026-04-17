@@ -26,8 +26,8 @@ public static class DemoDefaults
 {
     public const string ServerUrl = "http://100.97.72.86:5000";
     public const string Email = "user@aican.com";
-    public const string DisplayName = "Nadia Islam";
-    public const string BotName = "RafiBot";
+    public const string DisplayName = "Jo S";
+    public const string BotName = "JoBot";
     public const string Department = "Finance";
     public const string PreferredLanguage = "en";
 }
@@ -64,7 +64,7 @@ public sealed class DesktopApiClient
 {
     private readonly HttpClient _httpClient = new()
     {
-        Timeout = TimeSpan.FromSeconds(45)
+        Timeout = TimeSpan.FromSeconds(30)
     };
 
     public async Task<bool> GetHealthAsync(string serverUrl)
@@ -138,6 +138,8 @@ public sealed class FolderWatcherService : IDisposable
     private readonly string _ownerEmail;
     private readonly string _folderPath;
     private readonly Action<string> _status;
+    private readonly HashSet<string> _inFlight = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _sync = new();
     private FileSystemWatcher? _watcher;
 
     public FolderWatcherService(
@@ -163,16 +165,31 @@ public sealed class FolderWatcherService : IDisposable
         _watcher = new FileSystemWatcher(_folderPath)
         {
             EnableRaisingEvents = true,
-            IncludeSubdirectories = false
+            IncludeSubdirectories = false,
+            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size
         };
         _watcher.Created += OnCreated;
+        _watcher.Changed += OnCreated;
     }
 
     private async void OnCreated(object sender, FileSystemEventArgs e)
     {
+        if (Directory.Exists(e.FullPath))
+        {
+            return;
+        }
+
+        lock (_sync)
+        {
+            if (!_inFlight.Add(e.FullPath))
+            {
+                return;
+            }
+        }
+
         try
         {
-            await Task.Delay(900);
+            await Task.Delay(1200);
             var request = await DesktopFileRequestBuilder.CreateAsync(e.FullPath, _department, _ownerEmail, VisibilityScope.Private);
             var response = await _client.RegisterFileAsync(_serverUrl, _sessionToken, request);
             _status($"Registered {request.FileName} to {response.RepositoryPath}");
@@ -181,6 +198,13 @@ public sealed class FolderWatcherService : IDisposable
         {
             _status($"Folder watcher error for {e.Name}: {ex.Message}");
         }
+        finally
+        {
+            lock (_sync)
+            {
+                _inFlight.Remove(e.FullPath);
+            }
+        }
     }
 
     public void Dispose()
@@ -188,6 +212,7 @@ public sealed class FolderWatcherService : IDisposable
         if (_watcher is not null)
         {
             _watcher.Created -= OnCreated;
+            _watcher.Changed -= OnCreated;
             _watcher.Dispose();
         }
     }

@@ -82,7 +82,14 @@ The default seeded tenant uses the hypothetical domain `aican.com`.
 - `docadmin@aican.com`
 - `user@aican.com`
 
-The desktop client defaults to the `user@aican.com` demo profile and a named bot (`RafiBot`) so the first-run demo works without additional setup.
+The desktop client defaults to the `user@aican.com` demo profile and a named bot (`JoBot`) for `Jo S` so the first-run demo works without additional setup.
+
+The Windows UI is tuned for a guided demo:
+
+- direct `Connect Bot` flow
+- status LED with single-word state
+- bottom ribbon controls for tone, work style, and language
+- manual upload plus watched-folder intake
 
 ## Worker notes
 
