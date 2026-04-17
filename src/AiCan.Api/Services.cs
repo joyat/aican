@@ -206,7 +206,8 @@ public sealed record ChunkVectorRecord(
     string RepositoryPath,
     string Summary,
     string Text,
-    float[] Vector);
+    float[] Vector,
+    string TenantDomain = "common");
 
 public sealed record VectorSearchHit(
     Guid ChunkId,
@@ -243,6 +244,11 @@ public sealed class CatalogDocument
 {
     public Guid Id { get; init; }
     public Guid OwnerUserId { get; init; }
+    /// <summary>
+    /// The tenant domain this document belongs to (e.g. "sungas.com").
+    /// Use "common" for shared seed documents accessible by all tenants.
+    /// </summary>
+    public string TenantDomain { get; init; } = "common";
     public string Title { get; init; } = string.Empty;
     public string Department { get; init; } = string.Empty;
     public VisibilityScope Visibility { get; init; }
@@ -318,13 +324,15 @@ public sealed class InMemoryUserDirectory : IUserDirectory
     private readonly ConcurrentDictionary<string, SessionExchangeResponse> _sessions = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Guid> _userIds = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SeedUserOptions> _seedUsers;
+    private readonly ITenantRegistry _tenantRegistry;
     private readonly string _userIdsPath;
     private readonly string _sessionsPath;
     private readonly object _sync = new();
 
-    public InMemoryUserDirectory(IOptions<AiCanOptions> options, RuntimePathProvider paths)
+    public InMemoryUserDirectory(IOptions<AiCanOptions> options, RuntimePathProvider paths, ITenantRegistry tenantRegistry)
     {
         _seedUsers = options.Value.SeedUsers.ToDictionary(x => x.Email, x => x, StringComparer.OrdinalIgnoreCase);
+        _tenantRegistry = tenantRegistry;
         _userIdsPath = paths.GetStateFile("user-ids.json");
         _sessionsPath = paths.GetStateFile("sessions.json");
 
@@ -354,15 +362,31 @@ public sealed class InMemoryUserDirectory : IUserDirectory
 
         var userId = _userIds.GetOrAdd(request.Email, _ => Guid.NewGuid());
         var displayName = string.IsNullOrWhiteSpace(request.DisplayName) ? seed.DisplayName : request.DisplayName;
-        var department = string.IsNullOrWhiteSpace(request.Department) ? seed.Department : request.Department;
+        var department  = string.IsNullOrWhiteSpace(request.Department)  ? seed.Department  : request.Department;
+        var role        = seed.Role;
+
+        // Server-side tenant registry overrides any client-declared values.
+        // If users.json lists this email, those values are authoritative.
+        var tenantProfile = _tenantRegistry.GetUserProfile(request.Email);
+        if (tenantProfile is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(tenantProfile.DisplayName)) displayName = tenantProfile.DisplayName;
+            if (!string.IsNullOrWhiteSpace(tenantProfile.Department))  department  = tenantProfile.Department;
+            if (!string.IsNullOrWhiteSpace(tenantProfile.Role))        role        = tenantProfile.Role;
+        }
+
+        var defaultBotName = $"{displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Ai"}Bot";
+        var botName = tenantProfile is not null && !string.IsNullOrWhiteSpace(tenantProfile.BotName)
+            ? tenantProfile.BotName
+            : string.IsNullOrWhiteSpace(request.BotName) ? defaultBotName : request.BotName;
 
         var response = new SessionExchangeResponse(
             userId,
             request.Email,
             displayName,
-            string.IsNullOrWhiteSpace(request.BotName) ? $"{displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "Ai"}Bot" : request.BotName,
+            botName,
             department,
-            Enum.Parse<UserRole>(seed.Role, ignoreCase: true),
+            Enum.Parse<UserRole>(role, ignoreCase: true),
             Convert.ToBase64String(Guid.NewGuid().ToByteArray()));
 
         _sessions[response.SessionToken] = response;
@@ -399,11 +423,13 @@ public sealed class InMemoryUserDirectory : IUserDirectory
 public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
 {
     private readonly ConcurrentDictionary<Guid, AssistantProfileDto> _profiles = new();
+    private readonly ITenantRegistry _tenantRegistry;
     private readonly string _profilesPath;
     private readonly object _sync = new();
 
-    public InMemoryAssistantProfileStore(RuntimePathProvider paths)
+    public InMemoryAssistantProfileStore(RuntimePathProvider paths, ITenantRegistry tenantRegistry)
     {
+        _tenantRegistry = tenantRegistry;
         _profilesPath = paths.GetStateFile("profiles.json");
         foreach (var pair in JsonStateFile.LoadOrDefault(_profilesPath, new Dictionary<Guid, AssistantProfileDto>()))
         {
@@ -413,6 +439,19 @@ public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
 
     public void UpsertFromSession(SessionExchangeResponse session, SessionExchangeRequest request)
     {
+        // Base defaults — overridden by tenant registry if user is registered
+        var tone      = "WarmProfessional";
+        var workStyle = "HelpfulAndConcise";
+        var language  = "en";
+
+        var tp = _tenantRegistry.GetUserProfile(session.Email);
+        if (tp is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(tp.Tone))      tone      = tp.Tone;
+            if (!string.IsNullOrWhiteSpace(tp.WorkStyle)) workStyle = tp.WorkStyle;
+            if (!string.IsNullOrWhiteSpace(tp.Language))  language  = tp.Language;
+        }
+
         _profiles.AddOrUpdate(
             session.UserId,
             _ => new AssistantProfileDto(
@@ -421,15 +460,19 @@ public sealed class InMemoryAssistantProfileStore : IAssistantProfileStore
                 session.DisplayName,
                 session.BotName,
                 session.Department,
-                "WarmProfessional",
-                "HelpfulAndConcise",
-                "en",
+                tone,
+                workStyle,
+                language,
                 session.Role),
             (_, existing) => existing with
             {
-                BotName = string.IsNullOrWhiteSpace(request.BotName) ? existing.BotName : request.BotName,
+                BotName     = session.BotName,
                 DisplayName = session.DisplayName,
-                Department = session.Department
+                Department  = session.Department,
+                // Only apply registry overrides on re-connect; preserve user's manual ribbon changes otherwise
+                Tone        = tp is not null && !string.IsNullOrWhiteSpace(tp.Tone) ? tp.Tone : existing.Tone,
+                WorkStyle   = tp is not null && !string.IsNullOrWhiteSpace(tp.WorkStyle) ? tp.WorkStyle : existing.WorkStyle,
+                PreferredLanguage = tp is not null && !string.IsNullOrWhiteSpace(tp.Language) ? tp.Language : existing.PreferredLanguage
             });
 
         Persist();
@@ -831,7 +874,8 @@ public sealed class DocumentIndexer : IDocumentIndexer
                 document.RepositoryPath,
                 document.Summary,
                 chunk.Text,
-                vectors[index]))
+                vectors[index],
+                document.TenantDomain))
             .ToList();
 
         await _vectorStore.UpsertAsync(records, cancellationToken);
@@ -1238,6 +1282,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
         {
             Id = documentId,
             OwnerUserId = session.UserId,
+            TenantDomain = ITenantRegistry.ExtractDomain(session.Email),
             Title = fileName,
             Department = request.Department,
             Visibility = request.Visibility,
@@ -1752,73 +1797,31 @@ public sealed class LmStudioProvider : ILLMProvider
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly AiCanOptions _options;
-    private string? _cachedSoulContent;
-    private readonly object _soulLock = new();
+    private readonly ITenantRegistry _tenantRegistry;
 
-    public LmStudioProvider(IHttpClientFactory httpClientFactory, IOptions<AiCanOptions> options)
+    public LmStudioProvider(IHttpClientFactory httpClientFactory, IOptions<AiCanOptions> options, ITenantRegistry tenantRegistry)
     {
         _httpClientFactory = httpClientFactory;
         _options = options.Value;
+        _tenantRegistry = tenantRegistry;
     }
 
     /// <summary>
-    /// Loads SOUL.md, IDENTITY.md, and AGENTS.md from the configured workspace directory.
-    /// The result is cached after the first successful load.
-    /// Falls back to a sensible generic soul if the files are missing or the path is not set.
-    /// </summary>
-    private string LoadSoulContent()
-    {
-        lock (_soulLock)
-        {
-            if (_cachedSoulContent is not null)
-            {
-                return _cachedSoulContent;
-            }
-
-            var parts = new List<string>();
-
-            if (!string.IsNullOrWhiteSpace(_options.WorkspaceRoot))
-            {
-                var root = Path.GetFullPath(_options.WorkspaceRoot);
-                foreach (var fileName in new[] { "SOUL.md", "IDENTITY.md", "AGENTS.md" })
-                {
-                    var path = Path.Combine(root, fileName);
-                    if (File.Exists(path))
-                    {
-                        var content = File.ReadAllText(path).Trim();
-                        if (!string.IsNullOrWhiteSpace(content))
-                        {
-                            parts.Add(content);
-                        }
-                    }
-                }
-            }
-
-            if (parts.Count == 0)
-            {
-                parts.Add("You are a warm, professional, and trustworthy workplace assistant.\nBe helpful, grounded, and never fabricate document access or citations.");
-            }
-
-            _cachedSoulContent = string.Join("\n\n---\n\n", parts);
-            return _cachedSoulContent;
-        }
-    }
-
-    /// <summary>
-    /// Builds the LLM system message by combining the OpenClaw soul/identity files
+    /// Builds the LLM system message by combining the tenant-specific soul/identity files
     /// with this employee's personal profile (name, department, tone).
-    /// This is what gives the bot its warm, familiar feel per employee.
+    /// Soul files are loaded from workspace/tenants/{domain}/ and cached per domain.
     /// </summary>
     private string BuildSystemMessage(AssistantProfileDto profile, SessionExchangeResponse session)
     {
-        var soul = LoadSoulContent();
+        var domain = ITenantRegistry.ExtractDomain(session.Email);
+        var soul   = _tenantRegistry.LoadSoul(domain);
         return $"""
             {soul}
 
             ---
 
             You are currently acting as {profile.BotName}, the personal assistant for {profile.DisplayName} ({session.Email}).
-            Department: {session.Department}. Role: {session.Role}.
+            Company domain: {domain}. Department: {session.Department}. Role: {session.Role}.
             Preferred language: {profile.PreferredLanguage}. Work style: {profile.WorkStyle}. Tone: {profile.Tone}.
             Always stay within the authorized context the user has been given.
             Never claim access to documents that were not provided in the authorized context below.
@@ -2030,6 +2033,7 @@ public sealed class QdrantVectorStore : IVectorStore
                         repository_path = chunk.RepositoryPath,
                         summary = chunk.Summary,
                         text = chunk.Text,
+                        tenant = chunk.TenantDomain,
                         access_tags = BuildAccessTags(chunk).ToArray()
                     }
                 }).ToArray()
@@ -2054,6 +2058,7 @@ public sealed class QdrantVectorStore : IVectorStore
 
         var client = CreateClient();
         var effectiveLimit = Math.Max(Math.Max(limit, 1), _options.SearchLimit);
+        var tenantDomain   = ITenantRegistry.ExtractDomain(session.Email);
         using var response = await client.PostAsJsonAsync(
             $"collections/{_options.CollectionName}/points/search",
             new
@@ -2063,6 +2068,20 @@ public sealed class QdrantVectorStore : IVectorStore
                 with_payload = true,
                 filter = new
                 {
+                    // must: tenant scope  (this tenant's docs OR shared "common" docs)
+                    // should: access level (public, dept, or user-private)
+                    // Both conditions must be satisfied simultaneously.
+                    must = new object[]
+                    {
+                        new
+                        {
+                            should = new object[]
+                            {
+                                new { key = "tenant", match = new { value = tenantDomain } },
+                                new { key = "tenant", match = new { value = "common" } }
+                            }
+                        }
+                    },
                     should = new object[]
                     {
                         new { key = "access_tags", match = new { value = "common" } },
@@ -2191,5 +2210,118 @@ public sealed class QdrantVectorStore : IVectorStore
     {
         var value = element.GetProperty(propertyName).GetString();
         return Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MULTI-TENANT SUPPORT
+// Each client (sungas.com, laugfsgas.com, …) gets its own:
+//   • Soul files  — workspace/tenants/{domain}/SOUL.md, IDENTITY.md, AGENTS.md
+//   • User roster — workspace/tenants/{domain}/users.json
+//   • Qdrant isolation — "tenant" payload field scopes vector searches per domain
+// Falls back to the global workspace soul if tenant directory is absent.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Server-side profile entry for one employee, loaded from tenants/{domain}/users.json.
+/// Any non-empty field here overrides what the desktop Connection panel sent.
+/// </summary>
+public sealed class TenantUserProfile
+{
+    public string DisplayName  { get; set; } = string.Empty;
+    public string BotName      { get; set; } = string.Empty;
+    public string Department   { get; set; } = string.Empty;
+    public string Role         { get; set; } = "User";
+    public string Tone         { get; set; } = "WarmProfessional";
+    public string WorkStyle    { get; set; } = "HelpfulAndConcise";
+    public string Language     { get; set; } = "en";
+}
+
+public interface ITenantRegistry
+{
+    /// <summary>Extracts the domain part from an email address.</summary>
+    static string ExtractDomain(string email)
+    {
+        var at = email.IndexOf('@');
+        return at >= 0 ? email[(at + 1)..].Trim().ToLowerInvariant() : "default";
+    }
+
+    /// <summary>
+    /// Returns the server-side profile for this email, or null if not in any registry.
+    /// </summary>
+    TenantUserProfile? GetUserProfile(string email);
+
+    /// <summary>
+    /// Returns the combined soul text (SOUL.md + IDENTITY.md + AGENTS.md) for this domain.
+    /// Looks in tenants/{domain}/ first, falls back to workspace root.
+    /// </summary>
+    string LoadSoul(string domain);
+}
+
+public sealed class TenantRegistry : ITenantRegistry
+{
+    private readonly string _workspaceRoot;
+    private readonly ConcurrentDictionary<string, string>                              _soulCache  = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Dictionary<string, TenantUserProfile>> _userCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public TenantRegistry(IOptions<AiCanOptions> options)
+    {
+        _workspaceRoot = string.IsNullOrWhiteSpace(options.Value.WorkspaceRoot)
+            ? string.Empty
+            : Path.GetFullPath(options.Value.WorkspaceRoot);
+    }
+
+    public TenantUserProfile? GetUserProfile(string email)
+    {
+        var domain = ITenantRegistry.ExtractDomain(email);
+        var users  = _userCache.GetOrAdd(domain, LoadUsersJson);
+        return users.TryGetValue(email.ToLowerInvariant(), out var profile) ? profile : null;
+    }
+
+    public string LoadSoul(string domain)
+    {
+        return _soulCache.GetOrAdd(domain, d =>
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrEmpty(_workspaceRoot))
+            {
+                // 1. Tenant-specific soul files
+                var tenantDir = Path.Combine(_workspaceRoot, "tenants", d);
+                AppendSoulFiles(tenantDir, parts);
+
+                // 2. Fallback: global soul files in workspace root
+                if (parts.Count == 0)
+                    AppendSoulFiles(_workspaceRoot, parts);
+            }
+
+            if (parts.Count == 0)
+                parts.Add("You are a warm, professional, and trustworthy workplace assistant.\nBe helpful, grounded, and never fabricate document access or citations.");
+
+            return string.Join("\n\n---\n\n", parts);
+        });
+    }
+
+    private static void AppendSoulFiles(string directory, List<string> parts)
+    {
+        foreach (var name in new[] { "SOUL.md", "IDENTITY.md", "AGENTS.md" })
+        {
+            var path = Path.Combine(directory, name);
+            if (!File.Exists(path)) continue;
+            var text = File.ReadAllText(path).Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                parts.Add(text);
+        }
+    }
+
+    private Dictionary<string, TenantUserProfile> LoadUsersJson(string domain)
+    {
+        if (string.IsNullOrEmpty(_workspaceRoot))
+            return new Dictionary<string, TenantUserProfile>(StringComparer.OrdinalIgnoreCase);
+
+        var path = Path.Combine(_workspaceRoot, "tenants", domain, "users.json");
+        return JsonStateFile.LoadOrDefault(
+            path,
+            new Dictionary<string, TenantUserProfile>(StringComparer.OrdinalIgnoreCase));
     }
 }

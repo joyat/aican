@@ -1,0 +1,92 @@
+{
+  "joy@sungas.com": {
+    "displayName": "Joy S",
+    "botName": "SunBot",
+    "department": "Finance",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "admin@sungas.com": {
+    "displayName": "Admin User",
+    "botName": "SunBot",
+    "department": "IT",
+    "role": "PlatformAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "docadmin@sungas.com": {
+    "displayName": "Doc Admin",
+    "botName": "SunBot",
+    "department": "General",
+    "role": "DocAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "nimal@sungas.com": {
+    "displayName": "Nimal P",
+    "botName": "SunBot",
+    "department": "Procurement",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "kamala@sungas.com": {
+    "displayName": "Kamala R",
+    "botName": "SunBot",
+    "department": "HR",
+    "role": "User",
+    "tone": "Warm",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "suresh@sungas.com": {
+    "displayName": "Suresh M",
+    "botName": "SunBot",
+    "department": "Operations",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "Direct",
+    "language": "en"
+  },
+  "priya@sungas.com": {
+    "displayName": "Priya T",
+    "botName": "SunBot",
+    "department": "Sales",
+    "role": "User",
+    "tone": "Warm",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "rohan@sungas.com": {
+    "displayName": "Rohan F",
+    "botName": "SunBot",
+    "department": "Finance",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "chathura@sungas.com": {
+    "displayName": "Chathura W",
+    "botName": "SunBot",
+    "department": "IT",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "dilini@sungas.com": {
+    "displayName": "Dilini A",
+    "botName": "SunBot",
+    "department": "Operations",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "Direct",
+    "language": "en"
+  }
+}

@@ -33,6 +33,7 @@ builder.Services.AddHttpClient(nameof(QdrantVectorStore))
     .ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddSingleton<SessionContextAccessor>();
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddSingleton<ITenantRegistry, TenantRegistry>();
 builder.Services.AddSingleton<IUserDirectory, InMemoryUserDirectory>();
 builder.Services.AddSingleton<IAssistantProfileStore, InMemoryAssistantProfileStore>();
 builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();

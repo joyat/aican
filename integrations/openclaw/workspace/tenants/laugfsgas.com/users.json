@@ -1,0 +1,92 @@
+{
+  "user@laugfsgas.com": {
+    "displayName": "Demo User",
+    "botName": "LaugBot",
+    "department": "General",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "admin@laugfsgas.com": {
+    "displayName": "Admin User",
+    "botName": "LaugBot",
+    "department": "IT",
+    "role": "PlatformAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "docadmin@laugfsgas.com": {
+    "displayName": "Doc Admin",
+    "botName": "LaugBot",
+    "department": "General",
+    "role": "DocAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "kasun@laugfsgas.com": {
+    "displayName": "Kasun D",
+    "botName": "LaugBot",
+    "department": "Finance",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "malini@laugfsgas.com": {
+    "displayName": "Malini S",
+    "botName": "LaugBot",
+    "department": "HR",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "ravindra@laugfsgas.com": {
+    "displayName": "Ravindra B",
+    "botName": "LaugBot",
+    "department": "Procurement",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "thilini@laugfsgas.com": {
+    "displayName": "Thilini P",
+    "botName": "LaugBot",
+    "department": "Operations",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "Direct",
+    "language": "en"
+  },
+  "arjun@laugfsgas.com": {
+    "displayName": "Arjun N",
+    "botName": "LaugBot",
+    "department": "Sales",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  },
+  "samantha@laugfsgas.com": {
+    "displayName": "Samantha E",
+    "botName": "LaugBot",
+    "department": "Legal",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "chamath@laugfsgas.com": {
+    "displayName": "Chamath G",
+    "botName": "LaugBot",
+    "department": "IT",
+    "role": "User",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en"
+  }
+}
