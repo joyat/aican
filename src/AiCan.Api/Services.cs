@@ -778,6 +778,12 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
         }
 
         var citations = await _retrieval.RetrieveAsync(session, request.Message, cancellationToken);
+        if (TryBuildCitationGroundedResponse(profile, request.Message, citations, out var groundedResponse))
+        {
+            _conversations.Append(session.UserId, MessageRole.Assistant, groundedResponse);
+            return new ChatResponse(groundedResponse, citations, BuildSuggestedActions(citations));
+        }
+
         var context = citations.Count == 0
             ? "No authorized document citations were found."
             : string.Join(Environment.NewLine, citations.Select(c => $"- {c.Title}: {c.Snippet}"));
@@ -819,6 +825,58 @@ public sealed class AssistantOrchestrator : IAssistantOrchestrator
 
         response = string.Empty;
         return false;
+    }
+
+    private static bool TryBuildCitationGroundedResponse(
+        AssistantProfileDto profile,
+        string message,
+        IReadOnlyList<CitationDto> citations,
+        out string response)
+    {
+        if (citations.Count == 0)
+        {
+            response = string.Empty;
+            return false;
+        }
+
+        var primary = citations[0];
+        var builder = new StringBuilder();
+        builder.Append($"Based on the documents I can access for you, {primary.Snippet}");
+
+        if (citations.Count > 1)
+        {
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.Append("Supporting context: ");
+            builder.Append(string.Join(" | ", citations.Skip(1).Take(2).Select(c => c.Snippet)));
+        }
+
+        if (LooksLikePurchaseQuestion(message))
+        {
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.Append($"Source: {primary.Title}.");
+        }
+        else
+        {
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.Append($"{profile.BotName} can open the cited document or help reclassify it if needed.");
+        }
+
+        response = builder.ToString().Trim();
+        return true;
+    }
+
+    private static bool LooksLikePurchaseQuestion(string message)
+    {
+        var normalized = message.Trim().ToLowerInvariant();
+        return normalized.Contains("purchase", StringComparison.Ordinal)
+            || normalized.Contains("bought", StringComparison.Ordinal)
+            || normalized.Contains("invoice", StringComparison.Ordinal)
+            || normalized.Contains("last", StringComparison.Ordinal)
+            || normalized.Contains("latest", StringComparison.Ordinal)
+            || normalized.Contains("when did we", StringComparison.Ordinal);
     }
 
     private static IReadOnlyList<SuggestedActionDto> BuildSuggestedActions(IReadOnlyList<CitationDto> citations)
