@@ -1,33 +1,6 @@
 {
-  "user@laugfsgas.com": {
-    "displayName": "Demo User",
-    "botName": "LaugBot",
-    "department": "General",
-    "role": "User",
-    "tone": "Formal",
-    "workStyle": "Precise",
-    "language": "en"
-  },
-  "admin@laugfsgas.com": {
-    "displayName": "Admin User",
-    "botName": "LaugBot",
-    "department": "IT",
-    "role": "PlatformAdmin",
-    "tone": "Formal",
-    "workStyle": "Precise",
-    "language": "en"
-  },
-  "docadmin@laugfsgas.com": {
-    "displayName": "Doc Admin",
-    "botName": "LaugBot",
-    "department": "General",
-    "role": "DocAdmin",
-    "tone": "Formal",
-    "workStyle": "Precise",
-    "language": "en"
-  },
-  "kasun@laugfsgas.com": {
-    "displayName": "Kasun D",
+  "fin1@laugfsgas.com": {
+    "displayName": "Finance User 1",
     "botName": "LaugBot",
     "department": "Finance",
     "role": "User",
@@ -35,55 +8,37 @@
     "workStyle": "Precise",
     "language": "en"
   },
-  "malini@laugfsgas.com": {
-    "displayName": "Malini S",
+  "fin2@laugfsgas.com": {
+    "displayName": "Finance User 2",
     "botName": "LaugBot",
-    "department": "HR",
-    "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
-    "language": "en"
-  },
-  "ravindra@laugfsgas.com": {
-    "displayName": "Ravindra B",
-    "botName": "LaugBot",
-    "department": "Procurement",
+    "department": "Finance",
     "role": "User",
     "tone": "Formal",
     "workStyle": "Precise",
     "language": "en"
   },
-  "thilini@laugfsgas.com": {
-    "displayName": "Thilini P",
+  "fin3@laugfsgas.com": {
+    "displayName": "Finance User 3",
     "botName": "LaugBot",
-    "department": "Operations",
-    "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "Direct",
-    "language": "en"
-  },
-  "arjun@laugfsgas.com": {
-    "displayName": "Arjun N",
-    "botName": "LaugBot",
-    "department": "Sales",
-    "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
-    "language": "en"
-  },
-  "samantha@laugfsgas.com": {
-    "displayName": "Samantha E",
-    "botName": "LaugBot",
-    "department": "Legal",
+    "department": "Finance",
     "role": "User",
     "tone": "Formal",
     "workStyle": "Precise",
     "language": "en"
   },
-  "chamath@laugfsgas.com": {
-    "displayName": "Chamath G",
+  "admin@laugfsgas.com": {
+    "displayName": "Laugfs Admin",
     "botName": "LaugBot",
     "department": "IT",
+    "role": "PlatformAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en"
+  },
+  "hr@laugfsgas.com": {
+    "displayName": "HR User",
+    "botName": "LaugBot",
+    "department": "HR",
     "role": "User",
     "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",

@@ -1,41 +1,41 @@
 {
-  "fin1@sungas.com": {
+  "fin1@moongas.com": {
     "displayName": "Finance User 1",
     "department": "Finance",
     "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
+    "tone": "Formal",
+    "workStyle": "Precise",
     "language": "en"
   },
-  "fin2@sungas.com": {
+  "fin2@moongas.com": {
     "displayName": "Finance User 2",
     "department": "Finance",
     "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
+    "tone": "Formal",
+    "workStyle": "Precise",
     "language": "en"
   },
-  "fin3@sungas.com": {
+  "fin3@moongas.com": {
     "displayName": "Finance User 3",
     "department": "Finance",
     "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
+    "tone": "Formal",
+    "workStyle": "Precise",
     "language": "en"
   },
-  "admin@sungas.com": {
-    "displayName": "Sungas Admin",
+  "admin@moongas.com": {
+    "displayName": "Moongas Admin",
     "department": "IT",
     "role": "PlatformAdmin",
     "tone": "Formal",
     "workStyle": "Precise",
     "language": "en"
   },
-  "hr@sungas.com": {
+  "hr@moongas.com": {
     "displayName": "HR User",
     "department": "HR",
     "role": "User",
-    "tone": "Warm",
+    "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",
     "language": "en"
   }
