@@ -1888,7 +1888,7 @@ public sealed class LmStudioProvider : ILLMProvider
 
     private static string BuildFallback(AssistantProfileDto profile, string prompt)
     {
-        return $"{profile.BotName}: I could not reach the LM Studio brain right now. Please check that LM Studio is running on the Mac and the model is loaded. Prompt excerpt: {prompt[..Math.Min(prompt.Length, 180)]}";
+        return $"{profile.BotName}: I could not reach the configured LLM endpoint right now. Check that the model server is running and reachable. Prompt excerpt: {prompt[..Math.Min(prompt.Length, 180)]}";
     }
 }
 

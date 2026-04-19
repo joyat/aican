@@ -1,259 +1,201 @@
 # AiCan
 
-AiCan is a multi-tenant enterprise workplace assistant. Each client company gets its own named bot with its own personality, guardrails, and document index. Each employee within that company gets a further-personalised instance of that bot.
+AiCan is a multi-tenant workplace assistant platform for internal knowledge retrieval, document intake, and guided chat. It combines a desktop client, a .NET API, a Python AI worker, tenant-scoped prompt configuration, and a vector index so each organization can run the same product with isolated identity, policy, and retrieval context.
 
-The runtime architecture is three layers:
+The repository is public. Infrastructure endpoints, host-specific paths, and machine-specific credentials are intentionally excluded from the committed defaults. Tenant domains, employee rosters, and documents under `integrations/openclaw/workspace/tenants/` are synthetic demo data.
 
-- **LM Studio brain** — raw LLM inference on the Mac
-- **OpenClaw personality layer** — per-tenant soul files define character, tone, and guardrails
-- **AiCan orchestration** — Ubuntu API handles sessions, ACL, conversation history, and RAG retrieval
+## What the system does
 
-## Hardware layout
+- Provides a desktop chat experience for employees
+- Resolves a user into a tenant and assistant profile
+- Stores conversation state and assistant preferences
+- Registers and classifies uploaded documents
+- Extracts text, chunks content, and embeds passages
+- Indexes vectors in Qdrant and retrieves tenant-authorized context
+- Injects tenant-specific prompt files as the assistant identity layer
 
-| Machine | Tailscale IP | Role |
-|---------|-------------|------|
-| Windows desktop | `100.86.148.40` | WPF client — employee-facing |
-| Ubuntu server | `100.97.72.86` | ASP.NET Core API (port 5000), AI worker (port 8001), Qdrant (port 6333) |
-| Mac | `100.81.186.55` | LM Studio running `google/gemma-4-e4b` on port 1234 |
+## Architecture
 
-All three machines communicate over Tailscale VPN.
+| Layer | Technology | Responsibility |
+|------|------------|----------------|
+| Desktop client | WPF on .NET 8 | Employee UI, session bootstrap, chat, profile updates, watched-folder intake |
+| API | ASP.NET Core Minimal API on .NET 8 | Session exchange, assistant orchestration, tenant resolution, document intake, retrieval, audit events |
+| AI worker | FastAPI + Python | Document text extraction, simple classification, embedding generation |
+| Vector store | Qdrant | Passage storage and similarity search |
+| LLM endpoint | LM Studio or another OpenAI-compatible endpoint | Final response generation |
+| Prompt layer | OpenClaw workspace files | Tenant identity, tone, guardrails, routing instructions |
+
+## Request flow
+
+1. The desktop client exchanges a session with the API using an email, display name, department, and bot name.
+2. The API resolves the user profile. If a tenant `users.json` entry exists, the server-side tenant profile overrides client-supplied values.
+3. Chat requests are routed through the assistant runtime, which loads tenant prompt files and recent conversation history.
+4. Retrieval embeds the current query, applies tenant and access filters, and fetches authorized passages from Qdrant.
+5. The API assembles the final prompt from the tenant soul, employee profile, recent history, and citations.
+6. The LLM endpoint generates the answer, and the API returns the response with citations.
+
+## Multi-tenant model
+
+AiCan treats the email domain as the tenant key. Each tenant can define:
+
+- `SOUL.md`: behavior and tone
+- `IDENTITY.md`: company and assistant identity
+- `AGENTS.md`: routing and operating rules
+- `users.json`: tenant-owned user registry and profile overrides
+- `docs/`: synthetic example documents used for retrieval tests and demos
+
+If no tenant directory exists for a user domain, the API falls back to the global workspace files under `integrations/openclaw/workspace/`.
 
 ## Repository layout
 
-```
+```text
 src/
-  AiCan.Contracts/          Shared DTOs and enums (client + server)
-  AiCan.Api/                ASP.NET Core API — sessions, chat, intake, retrieval
-  AiCan.Desktop/            WPF desktop client
+  AiCan.Api/                 ASP.NET Core API and orchestration layer
+  AiCan.Contracts/           Shared DTOs and enums
+  AiCan.Desktop/             WPF desktop client
 
-integrations/openclaw/
-  workspace/                Global fallback soul files (used when no tenant match)
-    SOUL.md
-    IDENTITY.md
-    AGENTS.md
-    tenants/
-      sungas.com/           Sungas-specific soul + user registry
-        SOUL.md
-        IDENTITY.md
-        AGENTS.md
-        users.json
-      laugfsgas.com/        LAUGFS-specific soul + user registry
-        SOUL.md
-        IDENTITY.md
-        AGENTS.md
-        users.json
+workers/
+  ai_worker/                 FastAPI worker for extraction and embeddings
 
-workers/ai_worker/          FastAPI embedding + OCR + extraction worker
+integrations/
+  openclaw/
+    workspace/               Tenant and global prompt files
+    tools-mcp/               Early MCP bridge scaffolding
+
 deploy/
-  ubuntu/                   API deploy and service scripts
-  windows/                  Desktop rebuild and relaunch scripts
+  ubuntu/                    Linux helper scripts
+  windows/                   Windows helper scripts
 ```
 
-## How a chat message flows
+## Core implementation details
 
-1. Employee types a message in the WPF desktop app.
-2. Desktop sends `POST /assistant/chat` to the Ubuntu API (`X-AiCan-Session` header carries the session token).
-3. The API's `AssistantOrchestrator` runs:
-   - **Session resolve** — the session token maps to a stable `UserId` (Guid). The tenant domain is derived from the user's email.
-   - **History** — the last 10 non-system turns are retrieved from `InMemoryConversationStore` (keyed by `UserId`).
-   - **Retrieval** — `RetrievalService` embeds an enriched query (current message + tail of last bot reply) and searches Qdrant. The search filter enforces both tenant isolation (`tenant = sungas.com OR common`) and ACL (`access_tags = common | dept:finance | user:<guid>`).
-   - **Prompt assembly** — a prompt is built with the bot's name/style, the employee's message, and authorized citation snippets.
-   - **LLM call** — `LmStudioProvider` sends a `chat/completions` request to LM Studio. The system message contains the tenant-specific soul files plus the employee profile. The full multi-turn history is prepended so the model has conversational context.
-   - **Response** — the LLM reply is returned as `ChatResponse.Message`. Citations appear inline, formatted as `── Sources: title1  ·  title2`.
+### API
 
-## Multi-tenant setup
+The API is implemented with ASP.NET Core Minimal APIs. Important responsibilities include:
 
-AiCan is multi-tenant from the ground up. Each client company is identified by email domain.
+- session management via `IUserDirectory`
+- assistant profile persistence via `IAssistantProfileStore`
+- prompt assembly and response generation via `IAssistantRuntime`
+- document intake and indexing via `IDocumentIntakeService` and `IDocumentIndexer`
+- vector retrieval via `IRetrievalService` and `IVectorStore`
 
-### How tenant resolution works
+State is currently file-backed under `.runtime/` through simple JSON stores. This keeps the MVP easy to run locally, but it is not intended as a production persistence strategy.
 
-When an employee connects with `joy@sungas.com`, the API:
+### Worker
 
-1. Extracts the domain: `sungas.com`
-2. Looks for `workspace/tenants/sungas.com/users.json` → loads the server-side profile for this email (displayName, botName, department, tone, language). Client-submitted values are overridden by the registry.
-3. Loads soul files from `workspace/tenants/sungas.com/SOUL.md`, `IDENTITY.md`, `AGENTS.md`. Falls back to the global `workspace/` soul if no tenant directory is found.
-4. Tags all documents uploaded by this user with `tenant: sungas.com` in Qdrant. Retrieval queries are scoped to this tenant automatically.
+The worker exposes:
 
-### Adding a new tenant
+- `/extract` for file text extraction
+- `/classify` for lightweight heuristic categorization
+- `/embed` and `/embed-batch` for vector generation
 
-1. Create `integrations/openclaw/workspace/tenants/{domain}/`
-2. Add `SOUL.md`, `IDENTITY.md`, and `AGENTS.md` (copy from an existing tenant and customise)
-3. Add `users.json` with the employee roster (see format below)
-4. Copy the three soul files and `users.json` to the same path on Ubuntu under `/home/joyat/projects/aican/integrations/openclaw/workspace/tenants/{domain}/`
-5. Restart the API (or wait — soul files are cached per domain at first use, so a restart picks them up cleanly)
+The current implementation uses:
 
-No code changes or config changes are needed to add a new tenant.
+- `pypdf` for PDFs
+- `python-docx` for Word documents
+- `openpyxl` for spreadsheets
+- `sentence-transformers` for embeddings
 
-### Adding or updating users
+### Retrieval and authorization
 
-Edit `tenants/{domain}/users.json`. The API caches the user registry per domain at startup, so a restart is required to pick up new entries from existing deployments.
+Chunk vectors are written to Qdrant with tenant and document metadata. Retrieval applies both tenant scoping and document visibility rules before passages are included in the final prompt. This keeps the LLM grounded in the authorized slice of the workspace instead of the full corpus.
 
-```json
-{
-  "joy@sungas.com": {
-    "displayName": "Joy S",
-    "botName": "SunBot",
-    "department": "Finance",
-    "role": "User",
-    "tone": "WarmProfessional",
-    "workStyle": "HelpfulAndConcise",
-    "language": "en"
-  }
-}
-```
+### Prompt orchestration
 
-Valid roles: `User`, `DocAdmin`, `PlatformAdmin`.
-Valid tones: any string — injected into the LLM system prompt as-is.
-Language codes: `en`, `si` (Sinhala), `ta` (Tamil), or any BCP-47 tag.
-
-Fields not listed fall back to defaults (`WarmProfessional` tone, `HelpfulAndConcise` work style, `en` language).
-
-### Tenant data isolation
-
-Every Qdrant chunk carries a `tenant` payload field. The search filter is a nested Qdrant condition:
-
-```
-must:  [ tenant ∈ {sungas.com, common} ]
-should: [ access_tags ∈ {common, dept:finance, user:<guid>} ]
-```
-
-A Sungas Finance employee will never see a LAUGFS document in their retrieval results, and vice versa. Documents ingested via the watched folder are automatically tagged with the uploader's tenant domain. Seed documents (from `appsettings.json`) receive `tenant: common` and are visible to all tenants.
-
-## Current tenants
-
-| Domain | Bot name | Departments |
-|--------|----------|-------------|
-| `sungas.com` | SunBot | Finance, Procurement, Operations, HR, IT, Sales |
-| `laugfsgas.com` | LaugBot | Finance, Procurement, Operations, HR, IT, Sales, Legal |
-
-### Demo / internal tenant
-
-| Email | Role |
-|-------|------|
-| `admin@aican.com` | PlatformAdmin |
-| `docadmin@aican.com` | DocAdmin |
-| `user@aican.com` | User (default demo account) |
-
-The desktop client defaults to `user@aican.com` / `Jo S` / `JoBot` / `IT`. This account has no tenant soul files, so it uses the global fallback soul.
-
-## OpenClaw personality layer
-
-Soul files under `integrations/openclaw/workspace/tenants/{domain}/` define the bot's personality and are loaded by `TenantRegistry.LoadSoul(domain)`:
-
-- `SOUL.md` — tone, guardrails, and what the bot is for
-- `IDENTITY.md` — bot name, company, industry context
-- `AGENTS.md` — operational rules: department routing, escalation paths, language defaults
-
-These are injected as the LLM **system message** on every request, prefixed to the per-employee profile (name, department, tone, work style, language). The OpenClaw **CLI runner** is disabled (`OpenClaw:Enabled: false`) — the soul files are used as pure prompt content only.
-
-Soul content is cached per domain in memory after the first load. To force a reload without restarting, remove the cached entry by restarting the API process.
-
-## RAG pipeline
-
-Document intake runs centrally on Ubuntu:
-
-1. Desktop uploads or registers a file via `POST /documents/intake/register`.
-2. API classifies and stores it under a governed path in `.runtime/repository/`.
-3. API chunks extracted text into overlapping passage windows.
-4. AI worker embeds each chunk with `intfloat/multilingual-e5-base`.
-5. Chunk vectors and payload metadata — including `tenant` and `access_tags` — are written to Qdrant.
-6. At query time, retrieval is scoped to the employee's tenant domain and ACL tags.
-
-Qdrant data lives at `{project root}/.data/qdrant` on Ubuntu.
+The OpenClaw integration is used as a prompt layer, not as an actively invoked CLI runtime in the default configuration. Tenant soul files are loaded from disk and prepended to the model request as system context.
 
 ## Configuration
 
-`src/AiCan.Api/appsettings.json` is the committed base config. Ubuntu also has `src/AiCan.Api/appsettings.Local.json` (not committed):
+The committed base config in [`src/AiCan.Api/appsettings.json`](src/AiCan.Api/appsettings.json) uses repository-safe defaults. Machine-specific overrides belong in `src/AiCan.Api/appsettings.Local.json`, which is git-ignored.
+
+Example local override:
 
 ```json
 {
   "AiCan": {
-    "LmStudioBaseUrl": "http://100.81.186.55:1234/v1",
-    "WorkspaceRoot": "/home/joyat/projects/aican/integrations/openclaw/workspace",
+    "LmStudioBaseUrl": "http://127.0.0.1:1234/v1",
+    "WorkspaceRoot": "integrations/openclaw/workspace",
     "OpenClaw": {
-      "Enabled": false,
-      "WorkingDirectory": "/home/joyat/projects/aican",
-      "StateDir": "/home/joyat/projects/aican/.openclaw"
+      "WorkingDirectory": ".",
+      "StateDir": ".openclaw"
     }
   }
 }
 ```
 
-`WorkspaceRoot` is the root of the soul file tree. `TenantRegistry` resolves per-tenant files as `{WorkspaceRoot}/tenants/{domain}/`.
+Typical settings to override locally:
 
-## HTTP timeouts
+- the LLM endpoint URL
+- the worker base URL if it is not on `127.0.0.1:8001`
+- the workspace root if the API is launched outside the repository root
+- any OpenClaw CLI-specific paths if that runtime is enabled
 
-| Layer | Client | Timeout |
-|-------|--------|---------|
-| Server → LM Studio | `LmStudioProvider` named client | 120 s |
-| Server → AI worker | `WorkerEmbeddingProvider` named client | 120 s |
-| Desktop → Ubuntu API | `DesktopApiClient` | 180 s |
+## Local development
 
-## Health and status endpoints
+### Prerequisites
 
-- `GET /healthz` — API liveness
-- `GET /system/status` — aggregated checks for API, LLM, Worker, and Qdrant; drives the Windows service deck tiles
+- .NET 8 SDK
+- Python 3.10+ environment for the worker
+- Docker for Qdrant
+- An OpenAI-compatible chat endpoint such as LM Studio
 
-## Bring-up steps
-
-### Ubuntu
+### Start the supporting services
 
 ```bash
-cd /home/joyat/projects/aican
 docker compose up -d qdrant
-bash deploy/ubuntu/start_worker.sh
-dotnet build src/AiCan.Api/AiCan.Api.csproj -c Release
-nohup dotnet src/AiCan.Api/bin/Release/net8.0/AiCan.Api.dll \
-  --urls http://0.0.0.0:5000 > .runtime/logs/api.log 2>&1 &
 ```
-
-Ensure `appsettings.Local.json` exists before starting. The API bootstraps the document catalog into Qdrant on startup.
-
-For an in-place rebuild:
 
 ```bash
-bash deploy/ubuntu/deploy_api.sh
+cd workers/ai_worker
+pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8001
 ```
 
-### Windows desktop
+```bash
+dotnet run --project src/AiCan.Api/AiCan.Api.csproj
+```
+
+The default local API endpoint used by the desktop client and smoke test is `http://127.0.0.1:5080`.
+
+You can also use the helper scripts:
+
+```bash
+bash deploy/ubuntu/start_worker.sh
+bash deploy/ubuntu/start_api.sh
+```
+
+Run the end-to-end smoke test after the API, worker, and Qdrant are up:
+
+```bash
+bash scripts/demo_smoke_test.sh
+```
+
+The first worker startup may take longer because `sentence-transformers` may need to download and warm the embedding model before `/healthz` reports ready.
+
+Build the desktop client from Windows:
 
 ```powershell
-cd C:\Users\joyat\projects\aican
 dotnet build src\AiCan.Desktop\AiCan.Desktop.csproj -c Release
 ```
 
-For rebuild + interactive relaunch via scheduled task:
+## Public repo hygiene
 
-```powershell
-powershell -ExecutionPolicy Bypass -File deploy\windows\rebuild_desktop.ps1
-```
+The repository now follows these rules:
 
-The desktop shortcut at `C:\Users\joyat\Desktop\AiCan.lnk` points to the Release binary.
+- committed config stays generic and machine-agnostic
+- host-specific overrides go in ignored local config
+- helper scripts resolve paths dynamically instead of embedding usernames
+- tenant demo data is explicitly synthetic
 
-### Mac
+## Current limitations
 
-Load `google/gemma-4-e4b` in LM Studio and start the local server on port 1234. No further configuration needed.
+- persistence is JSON-file based rather than database-backed
+- classification is heuristic and intentionally simple
+- the worker runs synchronously and is not yet designed for high throughput
+- desktop defaults assume a local or explicitly configured API endpoint
+- OpenClaw CLI integration exists behind a flag but is not the default runtime path
 
-## Demo flow
+## Related documentation
 
-1. Confirm LM Studio is running with the model loaded (Mac).
-2. Confirm the API is running: `curl http://100.97.72.86:5000/healthz` (Ubuntu).
-3. Open the Windows desktop client and click **Connect Bot**.
-4. Try: `When did we last purchase a printer?`
-5. Try: `Compose an email to Bright Stationers requesting a quote for 4 printers.`
-6. Drop a `.txt` or `.md` file into the watched folder and ask the bot about it.
-
-To demo multi-tenant isolation, connect once as `joy@sungas.com` and once as `kasun@laugfsgas.com`. Each session gets a different bot name, different soul files, and different document retrieval scope.
-
-## Project isolation
-
-AiCan runs on Ubuntu alongside the separate `tinman`/`nemoclaw` project (ports `18789`/`18791`). Do not change AiCan's port (5000) and do not restart tinman services.
-
-## Known limitations
-
-- Email ingestion is not implemented.
-- Microsoft 365 OAuth is scaffolded but requires a real Entra app registration.
-- The Python worker is synchronous over HTTP; not yet connected to an async job queue.
-- Scanned image-only PDFs need OCR hardening for reliable extraction.
-- Cold-start latency exists on the first LM Studio or embedding call after model load; run a warm-up query before a live demo.
-- Soul file and user registry changes require an API restart to take effect (caches are populated at startup).
+- [`integrations/openclaw/README.md`](integrations/openclaw/README.md) for the prompt-layer integration details
+- [`integrations/openclaw/workspace/README.md`](integrations/openclaw/workspace/README.md) for notes on synthetic tenant data

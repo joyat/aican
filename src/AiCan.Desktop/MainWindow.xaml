@@ -115,7 +115,7 @@
                              FontWeight="SemiBold"
                              Foreground="White"
                              Margin="0,2,0,2"
-                             Text="JoBot" />
+                             Text="AiCan Assistant" />
                   <TextBlock x:Name="BotMoodTextBlock"
                              FontSize="9"
                              Foreground="#3D6080"
@@ -215,7 +215,7 @@
                       </StackPanel>
                     </StackPanel>
                   </Border>
-                  <!-- JoBot -->
+                  <!-- Assistant -->
                   <Border Margin="0,0,3,0" Padding="8,5" CornerRadius="8" BorderThickness="1">
                     <Border.Background><SolidColorBrush Color="#08FFFFFF"/></Border.Background>
                     <Border.BorderBrush><SolidColorBrush Color="#162840"/></Border.BorderBrush>
@@ -224,7 +224,7 @@
                         <Ellipse.Effect><DropShadowEffect BlurRadius="5" ShadowDepth="0" Color="#F87171" Opacity="0.85" /></Ellipse.Effect>
                       </Ellipse>
                       <StackPanel>
-                        <TextBlock x:Name="BotInitialsTextBlock" Text="JoBot" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
+                        <TextBlock x:Name="BotInitialsTextBlock" Text="AA" FontSize="9.5" FontWeight="SemiBold" Foreground="#A8C8E8" />
                         <TextBlock x:Name="JoBotServiceStateText" FontSize="8" Foreground="#3D6080" Text="DOWN" />
                       </StackPanel>
                     </StackPanel>
@@ -421,7 +421,7 @@
                        FontSize="26"
                        FontWeight="Bold"
                        Foreground="White"
-                       Text="Talk to JoBot" />
+                       Text="Talk to AiCan Assistant" />
             <TextBlock x:Name="StatusTextBlock"
                        Margin="0,4,0,0"
                        Foreground="#2E5070"

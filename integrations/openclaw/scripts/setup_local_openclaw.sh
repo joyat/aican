@@ -35,7 +35,7 @@ cp "$ROOT_DIR"/integrations/openclaw/workspace/IDENTITY.md "$WORKSPACE_DIR"/IDEN
 )
 
 openclaw mcp set aican-tools "$(cat <<JSON
-{"command":"node","args":["$TOOLS_DIR/server.mjs"],"cwd":"$TOOLS_DIR","env":{"AICAN_API_BASE_URL":"http://127.0.0.1:5000"}}
+{"command":"node","args":["$TOOLS_DIR/server.mjs"],"cwd":"$TOOLS_DIR","env":{"AICAN_API_BASE_URL":"http://127.0.0.1:5080"}}
 JSON
 )"
 

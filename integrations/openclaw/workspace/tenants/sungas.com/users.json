@@ -1,42 +1,52 @@
 {
   "fin1@sungas.com": {
-    "displayName": "Finance User 1",
+    "displayName": "Priya Nair",
     "department": "Finance",
     "role": "User",
     "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",
-    "language": "en"
+    "language": "en",
+    "title": "Chief Financial Officer",
+    "location": "Singapore"
   },
   "fin2@sungas.com": {
-    "displayName": "Finance User 2",
+    "displayName": "Benjamin Lim",
     "department": "Finance",
     "role": "User",
     "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",
-    "language": "en"
+    "language": "en",
+    "title": "Finance Controller",
+    "location": "Singapore"
   },
   "fin3@sungas.com": {
-    "displayName": "Finance User 3",
+    "displayName": "Ananya Krishnamurthy",
     "department": "Finance",
     "role": "User",
     "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",
-    "language": "en"
+    "language": "en",
+    "title": "Senior Financial Analyst",
+    "location": "Bangalore"
   },
   "admin@sungas.com": {
-    "displayName": "Sungas Admin",
+    "displayName": "Aarav Shah",
     "department": "IT",
     "role": "PlatformAdmin",
     "tone": "Formal",
     "workStyle": "Precise",
-    "language": "en"
+    "language": "en",
+    "title": "Head of IT & Infrastructure",
+    "location": "Singapore"
   },
   "hr@sungas.com": {
-    "displayName": "HR User",
+    "displayName": "Sophie Hartmann",
     "department": "HR",
     "role": "User",
     "tone": "Warm",
     "workStyle": "HelpfulAndConcise",
-    "language": "en"
+    "language": "en",
+    "title": "Chief People Officer",
+    "location": "Singapore"
   }
 }

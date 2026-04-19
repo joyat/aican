@@ -1,42 +1,52 @@
 {
   "fin1@moongas.com": {
-    "displayName": "Finance User 1",
+    "displayName": "Claudia Brandt",
     "department": "Finance",
     "role": "User",
     "tone": "Formal",
     "workStyle": "Precise",
-    "language": "en"
+    "language": "en",
+    "title": "Chief Financial Officer",
+    "location": "Stuttgart"
   },
   "fin2@moongas.com": {
-    "displayName": "Finance User 2",
+    "displayName": "Hans-Peter Vogel",
     "department": "Finance",
     "role": "User",
     "tone": "Formal",
     "workStyle": "Precise",
-    "language": "en"
+    "language": "de",
+    "title": "Finance Controller",
+    "location": "Stuttgart"
   },
   "fin3@moongas.com": {
-    "displayName": "Finance User 3",
+    "displayName": "Ewa Kowalski",
     "department": "Finance",
     "role": "User",
     "tone": "Formal",
     "workStyle": "Precise",
-    "language": "en"
+    "language": "en",
+    "title": "Site Finance Manager, Warsaw",
+    "location": "Warsaw"
   },
   "admin@moongas.com": {
-    "displayName": "Moongas Admin",
+    "displayName": "Aarav Gupta",
     "department": "IT",
     "role": "PlatformAdmin",
     "tone": "Formal",
     "workStyle": "Precise",
-    "language": "en"
+    "language": "en",
+    "title": "Head of IT & Digital Transformation",
+    "location": "Stuttgart"
   },
   "hr@moongas.com": {
-    "displayName": "HR User",
+    "displayName": "Monika Berger",
     "department": "HR",
     "role": "User",
     "tone": "WarmProfessional",
     "workStyle": "HelpfulAndConcise",
-    "language": "en"
+    "language": "en",
+    "title": "HR Director, EMEA",
+    "location": "Stuttgart"
   }
 }

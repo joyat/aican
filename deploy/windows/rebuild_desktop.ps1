@@ -1,10 +1,10 @@
 # Rebuild AiCan Desktop and relaunch.
-# Run from PowerShell as joyat on the Windows machine.
 
-$root = "C:\Users\joyat\projects\aican"
+$root = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
 $proj = "$root\src\AiCan.Desktop\AiCan.Desktop.csproj"
 $exe  = "$root\src\AiCan.Desktop\bin\Release\net8.0-windows10.0.19041.0\AiCan.Desktop.exe"
 $task = "AiCanDesktopLaunch"
+$currentUser = $env:USERNAME
 
 Write-Host "=== AiCan Desktop rebuild ===" -ForegroundColor Cyan
 
@@ -19,7 +19,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "BUILD FAILED" -ForegroundColor Red; exit 
 
 # Launch in interactive session via scheduled task
 Write-Host "Launching in interactive session..."
-schtasks /create /f /tn $task /sc once /st 00:00 /tr $exe /ru joyat /it | Out-Null
+schtasks /create /f /tn $task /sc once /st 00:00 /tr $exe /ru $currentUser /it | Out-Null
 schtasks /run /tn $task | Out-Null
 
-Write-Host "=== Done — AiCan Desktop launched ===" -ForegroundColor Green
+Write-Host "=== Done - AiCan Desktop launched ===" -ForegroundColor Green

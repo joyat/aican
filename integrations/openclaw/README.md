@@ -1,71 +1,47 @@
 # OpenClaw Integration
 
-This directory holds the OpenClaw workspace files that give the AiCan assistant its personality. The files are loaded as the LLM system prompt layer — they are **not** used to run the OpenClaw CLI in the current MVP.
+This directory contains the prompt-layer integration for AiCan. The OpenClaw workspace files define tenant identity, tone, and operating rules. In the default setup, AiCan reads these files and injects them into the model request as system context; it does not rely on an actively running OpenClaw CLI process.
 
-## How it works
+## How it is used
 
-`LmStudioProvider` in `src/AiCan.Api/Services.cs` reads the workspace files once at startup and injects them as the system message on every LM Studio request, combined with the employee's profile:
+`TenantRegistry` loads `SOUL.md`, `IDENTITY.md`, and `AGENTS.md` from:
 
-```
-[soul content from SOUL.md + IDENTITY.md + AGENTS.md]
+- the tenant directory at `workspace/tenants/{domain}/`, when present
+- the global `workspace/` directory as a fallback
 
-You are currently acting as {BotName}, the personal assistant for {DisplayName} ({Email}).
-Department: {Department}. Role: {Role}.
-Preferred language: {PreferredLanguage}. Work style: {WorkStyle}. Tone: {Tone}.
-Always stay within the authorized context the user has been given.
-Never claim access to documents that were not provided in the authorized context below.
-When the employee uploads files, treat them as available only when they appear in the authorized context.
-```
-
-The server also sends several recent non-system conversation turns to LM Studio, so the OpenClaw soul stays consistent across follow-up questions instead of treating every chat as a fresh single turn.
-
-The user turn then carries the actual task prompt plus the citation snippets from retrieval.
+That content is combined with the employee profile and recent conversation history before the request is sent to the configured LLM endpoint.
 
 ## Workspace files
 
 | File | Purpose |
 |------|---------|
-| `SOUL.md` | Tone guardrails — friendly but not casual, never bluff, respect privacy |
-| `IDENTITY.md` | Bot name and theme |
-| `AGENTS.md` | Operational rules — stay grounded in authorized context, suggest reclassification rather than inventing locations |
-| `TOOLS.md` | Tool/action catalogue (referenced by AGENTS.md for future MCP wiring) |
+| `SOUL.md` | Tone, guardrails, and response constraints |
+| `IDENTITY.md` | Assistant identity and tenant context |
+| `AGENTS.md` | Routing rules and operating guidance |
+| `TOOLS.md` | Placeholder tool catalog for future MCP-based actions |
 
 ## Configuration
 
-The API reads the workspace directory from `AiCan:WorkspaceRoot` in `appsettings.Local.json`:
+The workspace root is configured through `AiCan:WorkspaceRoot`. A repository-safe example is:
 
 ```json
 {
   "AiCan": {
-    "WorkspaceRoot": "/home/joyat/projects/aican/integrations/openclaw/workspace"
+    "WorkspaceRoot": "integrations/openclaw/workspace"
   }
 }
 ```
 
-If `WorkspaceRoot` is empty or the files are missing, `LmStudioProvider` falls back gracefully (soul content is omitted; the employee profile section is still injected).
+If `WorkspaceRoot` is blank or the files are missing, the API falls back to a generic assistant system prompt.
 
-## OpenClaw CLI runner (disabled)
+## Synthetic demo data
 
-The `AiCan:OpenClaw:Enabled` flag controls whether the API tries to shell out to the `openclaw` CLI binary. This flag is set to `false` in `appsettings.Local.json` because the `openclaw` binary is not installed in the AiCan environment — only the soul/workspace files are used.
+The sample tenant directories in `workspace/tenants/` are demo fixtures. Domains, employee names, email addresses, policies, and example documents are synthetic and are included only to exercise the multi-tenant prompt and retrieval flow.
 
-The separate `tinman`/`nemoclaw` project on the same Ubuntu server runs a real openclaw-gateway on ports `18789`/`18791`. AiCan does not interact with that project.
+## OpenClaw CLI support
 
-## Extending the personality
+The codebase includes an `AiCan:OpenClaw:Enabled` switch and a runner abstraction for CLI-based execution. That path is optional and disabled in the default configuration. The primary runtime path in this repository is direct prompt injection plus server-side retrieval.
 
-To adjust the bot's behaviour, edit the workspace files and restart the API (or call the soul reload endpoint if one is added). Changes take effect immediately on the next startup because the files are loaded once at startup.
+## Future direction
 
-To give different employees different personalities, the current approach is to maintain one shared workspace. Per-employee soul overrides are a planned future feature.
-
-## Future: MCP tool wiring
-
-`TOOLS.md` and `tools-mcp/` sketch the planned MCP bridge that would let the LLM call AiCan actions (document search, access requests, reclassification) as structured tool calls. This is not yet active — the current retrieval is done server-side by `RetrievalService` before the LLM call, and the results are injected as plain text context.
-
-## Current MVP role split
-
-The current AiCan build uses this split:
-
-- `LM Studio brain` — actual text generation
-- `OpenClaw soul` — tone, persona, and behavioral guardrails
-- `AiCan secured comms + ACL + chunked RAG` — document authorization, retrieval, filing, and citations
-
-This is the intended MVP shape for the employee-facing bot.
+`TOOLS.md` and `tools-mcp/` outline a future MCP bridge for structured actions such as document search, access requests, and reclassification. Today, those operations remain server-side and their results are injected into the prompt as plain context.

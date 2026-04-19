@@ -74,7 +74,7 @@ public partial class MainWindow : Window
         RefreshBotIdentity();
         SetStatus("Connect the bot to begin.");
         SetPresence(PresenceState.Offline);
-        AddSystemMessage("AiCan is ready. Connect JoBot and start from the quick starters.");
+        AddSystemMessage("AiCan is ready. Connect the assistant and start from the quick starters.");
         RefreshActionState();
     }
 
@@ -204,7 +204,7 @@ public partial class MainWindow : Window
 
         if (_messages.Count == 0)
         {
-            AddSystemMessage("No prior conversation yet. Use a starter prompt or ask JoBot something directly.");
+            AddSystemMessage("No prior conversation yet. Use a starter prompt or ask the assistant something directly.");
         }
     }
 
@@ -255,7 +255,7 @@ public partial class MainWindow : Window
         SetStatus($"Personality applied for {profile.BotName}.");
         if (emitTimelineEvent)
         {
-            AddSystemMessage($"Updated JoBot's ribbon settings: tone {SelectedTone()}, work style {SelectedWorkStyle()}, language {SelectedLanguage()}.");
+            AddSystemMessage($"Updated {profile.BotName}'s ribbon settings: tone {SelectedTone()}, work style {SelectedWorkStyle()}, language {SelectedLanguage()}.");
         }
     }
 
@@ -730,7 +730,7 @@ public partial class MainWindow : Window
 
     private static string NormalizeBotName(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "RafiBot", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(value))
         {
             return DemoDefaults.BotName;
         }
@@ -740,7 +740,7 @@ public partial class MainWindow : Window
 
     private static string NormalizeDisplayName(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "Nadia Islam", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(value))
         {
             return DemoDefaults.DisplayName;
         }
@@ -753,7 +753,7 @@ public partial class MainWindow : Window
         var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
         {
-            return "JB";
+            return "AI";
         }
 
         return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));

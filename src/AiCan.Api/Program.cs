@@ -1,13 +1,18 @@
+using System.Text.Json.Serialization;
 using AiCan.Api;
 using AiCan.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Allow a local override file (git-ignored) to override any appsettings.json value.
-// Useful for per-machine secrets such as Tailscale IPs without modifying the committed config.
+// Useful for machine-specific endpoints and local secrets without modifying the committed config.
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
 
 builder.Services.Configure<AiCanOptions>(builder.Configuration.GetSection("AiCan"));
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
 builder.Services.AddSingleton<RuntimePathProvider>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

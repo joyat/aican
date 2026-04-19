@@ -86,6 +86,14 @@ def embed_texts(texts: List[str], input_type: str, model_name: str | None) -> Li
     return [row.tolist() for row in embeddings]
 
 
+@app.on_event("startup")
+async def warm_embedding_model() -> None:
+    model_name = os.getenv("AICAN_EMBEDDING_MODEL", "intfloat/multilingual-e5-base")
+    print(f"[AiCan Worker] Loading embedding model '{model_name}'...", flush=True)
+    load_embedder(model_name)
+    print(f"[AiCan Worker] Embedding model '{model_name}' is ready.", flush=True)
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok"}

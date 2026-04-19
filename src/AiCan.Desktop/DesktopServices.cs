@@ -24,11 +24,11 @@ public sealed record ApiHealthResponse(string Status);
 
 public static class DemoDefaults
 {
-    public const string ServerUrl = "http://100.97.72.86:5000";
-    public const string Email = "user@aican.com";
-    public const string DisplayName = "Jo S";
-    public const string BotName = "JoBot";
-    public const string Department = "Finance";
+    public const string ServerUrl = "http://127.0.0.1:5080";
+    public const string Email = "user@example.test";
+    public const string DisplayName = "Demo User";
+    public const string BotName = "AiCan Assistant";
+    public const string Department = "General";
     public const string PreferredLanguage = "en";
 }
 
@@ -62,8 +62,8 @@ public sealed class M365AuthService
 
 public sealed class DesktopApiClient
 {
-    // 180 s gives a slow local LLM (LM Studio on Mac over Tailscale) plenty of time
-    // to respond without leaving the UI locked indefinitely.
+    // 180 s gives a slow local LLM endpoint enough time to respond
+    // without leaving the UI locked indefinitely.
     private readonly HttpClient _httpClient = new()
     {
         Timeout = TimeSpan.FromSeconds(180)
