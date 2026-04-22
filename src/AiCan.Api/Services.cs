@@ -118,7 +118,7 @@ public interface IDocumentCatalog
 {
     CatalogDocument Add(CatalogDocument document);
     IReadOnlyList<CatalogDocument> GetAll();
-    IReadOnlyList<CatalogDocument> Search(Guid userId, string department, string query);
+    IReadOnlyList<CatalogDocument> Search(Guid userId, string department, string tenantDomain, string query);
     CatalogDocument? Get(Guid documentId);
     CatalogDocument UpdateExtractedText(Guid documentId, string extractedText, string summary);
     void MarkSuggestion(Guid documentId, string category, string reason);
@@ -569,10 +569,38 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         }
 
         SeedDocuments(options.Value.SeedDocuments, paths);
+        NormalizeDuplicates();
     }
 
     public CatalogDocument Add(CatalogDocument document)
     {
+        var existing = _documents.Values.FirstOrDefault(candidate =>
+            candidate.OwnerUserId == document.OwnerUserId &&
+            string.Equals(candidate.TenantDomain, document.TenantDomain, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(candidate.RepositoryPath, document.RepositoryPath, StringComparison.OrdinalIgnoreCase));
+
+        if (existing is not null)
+        {
+            var updated = new CatalogDocument
+            {
+                Id = existing.Id,
+                OwnerUserId = existing.OwnerUserId,
+                TenantDomain = existing.TenantDomain,
+                Title = document.Title,
+                Department = document.Department,
+                Visibility = document.Visibility,
+                Classification = document.Classification,
+                RepositoryPath = document.RepositoryPath,
+                Summary = document.Summary,
+                ExtractedText = document.ExtractedText,
+                Suggestion = existing.Suggestion
+            };
+
+            _documents[existing.Id] = updated;
+            Persist();
+            return updated;
+        }
+
         _documents[document.Id] = document;
         Persist();
         return document;
@@ -598,6 +626,7 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         {
             Id = existing.Id,
             OwnerUserId = existing.OwnerUserId,
+            TenantDomain = existing.TenantDomain,
             Title = existing.Title,
             Department = existing.Department,
             Visibility = existing.Visibility,
@@ -622,7 +651,7 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         }
     }
 
-    public IReadOnlyList<CatalogDocument> Search(Guid userId, string department, string query)
+    public IReadOnlyList<CatalogDocument> Search(Guid userId, string department, string tenantDomain, string query)
     {
         var terms = query
             .Split(new[] { ' ', '\t', '\r', '\n', ',', '.', '?', '!', ':', ';', '-', '_', '/' }, StringSplitOptions.RemoveEmptyEntries)
@@ -639,6 +668,7 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
                 Score = Score(document, query, terms)
             })
             .Where(x => x.Score > 0)
+            .Where(x => IsTenantVisibleToUser(x.Document, tenantDomain))
             .Where(document => document.Document.Visibility switch
             {
                 VisibilityScope.Private => document.Document.OwnerUserId == userId,
@@ -702,6 +732,61 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         {
             JsonStateFile.Save(_documentsPath, _documents.Values.OrderBy(x => x.Title).ToList());
         }
+    }
+
+    private void NormalizeDuplicates()
+    {
+        var changed = false;
+        foreach (var group in _documents.Values
+            .GroupBy(CreateDuplicateKey, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1))
+        {
+            var winner = group
+                .OrderByDescending(document => document.ExtractedText.Length)
+                .ThenByDescending(document => document.Summary.Length)
+                .ThenBy(document => document.Id)
+                .First();
+
+            var suggestion = group
+                .Select(document => document.Suggestion)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+            _documents[winner.Id] = new CatalogDocument
+            {
+                Id = winner.Id,
+                OwnerUserId = winner.OwnerUserId,
+                TenantDomain = winner.TenantDomain,
+                Title = winner.Title,
+                Department = winner.Department,
+                Visibility = winner.Visibility,
+                Classification = winner.Classification,
+                RepositoryPath = winner.RepositoryPath,
+                Summary = winner.Summary,
+                ExtractedText = winner.ExtractedText,
+                Suggestion = suggestion ?? winner.Suggestion
+            };
+
+            foreach (var duplicate in group.Where(document => document.Id != winner.Id))
+            {
+                changed |= _documents.TryRemove(duplicate.Id, out _);
+            }
+        }
+
+        if (changed)
+        {
+            Persist();
+        }
+    }
+
+    private static string CreateDuplicateKey(CatalogDocument document)
+    {
+        return $"{document.TenantDomain}|{document.OwnerUserId:D}|{document.RepositoryPath}";
+    }
+
+    private static bool IsTenantVisibleToUser(CatalogDocument document, string tenantDomain)
+    {
+        return string.Equals(document.TenantDomain, tenantDomain, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(document.TenantDomain, "common", StringComparison.OrdinalIgnoreCase);
     }
 
     private static int Score(CatalogDocument document, string query, IReadOnlyList<string> terms)
@@ -1203,7 +1288,7 @@ public sealed class RetrievalService : IRetrievalService
             Console.Error.WriteLine($"[Retrieval] Falling back to catalog search: {ex.Message}");
         }
 
-        return _catalog.Search(session.UserId, session.Department, query)
+        return _catalog.Search(session.UserId, session.Department, ITenantRegistry.ExtractDomain(session.Email), query)
             .Select(document => new CitationDto(document.Id, document.Title, document.RepositoryPath, document.Summary))
             .ToList();
     }
@@ -1266,7 +1351,6 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
 
     public async Task<IntakeRegisterResponse> RegisterAsync(SessionExchangeResponse session, IntakeRegisterRequest request, CancellationToken cancellationToken)
     {
-        var documentId = Guid.NewGuid();
         var fileName = Path.GetFileName(string.IsNullOrWhiteSpace(request.FileName) ? "document.bin" : request.FileName);
         var initialText = await BuildInitialExtractedTextAsync(request, fileName, cancellationToken);
         var classificationSeed = request with { ExtractedText = initialText };
@@ -1280,7 +1364,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
 
         var document = _catalog.Add(new CatalogDocument
         {
-            Id = documentId,
+            Id = Guid.NewGuid(),
             OwnerUserId = session.UserId,
             TenantDomain = ITenantRegistry.ExtractDomain(session.Email),
             Title = fileName,
@@ -1301,7 +1385,7 @@ public sealed class DocumentIntakeService : IDocumentIntakeService
             Console.Error.WriteLine($"[Document intake] Indexed metadata for {fileName}, but chunk indexing failed: {ex.Message}");
         }
 
-        return new IntakeRegisterResponse(documentId, repositoryPath.Replace('\\', '/'), classification.Category, request.Visibility, _clock.UtcNow);
+        return new IntakeRegisterResponse(document.Id, repositoryPath.Replace('\\', '/'), classification.Category, request.Visibility, _clock.UtcNow);
     }
 
     private async Task<string> BuildInitialExtractedTextAsync(IntakeRegisterRequest request, string fileName, CancellationToken cancellationToken)

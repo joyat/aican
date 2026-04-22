@@ -7,6 +7,8 @@ LOG_DIR="$ROOT_DIR/.runtime/logs"
 PID_DIR="$ROOT_DIR/.runtime/pids"
 WORKER_LOG="$LOG_DIR/worker.log"
 WORKER_PID="$PID_DIR/worker.pid"
+REQUIREMENTS_FILE="$ROOT_DIR/workers/ai_worker/requirements.txt"
+REQUIREMENTS_HASH_FILE="$VENV_DIR/.requirements.sha256"
 PYTHON_BIN="${PYTHON_BIN:-}"
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
@@ -53,8 +55,24 @@ if [[ ! -d "$VENV_DIR" ]]; then
 fi
 
 source "$VENV_DIR/bin/activate"
-pip install --upgrade pip >/dev/null
-pip install -r "$ROOT_DIR/workers/ai_worker/requirements.txt" >/dev/null
+REQUIREMENTS_HASH="$("$VENV_DIR/bin/python" - <<'PY' "$REQUIREMENTS_FILE"
+import hashlib
+import pathlib
+import sys
+
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+
+CURRENT_HASH=""
+if [[ -f "$REQUIREMENTS_HASH_FILE" ]]; then
+  CURRENT_HASH="$(cat "$REQUIREMENTS_HASH_FILE")"
+fi
+
+if [[ "$CURRENT_HASH" != "$REQUIREMENTS_HASH" ]]; then
+  PIP_DISABLE_PIP_VERSION_CHECK=1 "$VENV_DIR/bin/pip" install -r "$REQUIREMENTS_FILE" >/dev/null
+  printf '%s' "$REQUIREMENTS_HASH" > "$REQUIREMENTS_HASH_FILE"
+fi
 
 if [[ -f "$WORKER_PID" ]] && kill -0 "$(cat "$WORKER_PID")" 2>/dev/null; then
   echo "Worker is already running with PID $(cat "$WORKER_PID")"

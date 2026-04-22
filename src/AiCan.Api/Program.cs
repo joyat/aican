@@ -1,12 +1,11 @@
+using Microsoft.Extensions.FileProviders;
 using System.Text.Json.Serialization;
 using AiCan.Api;
 using AiCan.Contracts;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Allow a local override file (git-ignored) to override any appsettings.json value.
-// Useful for machine-specific endpoints and local secrets without modifying the committed config.
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+ConfigureRuntimeConfiguration(builder);
 
 builder.Services.Configure<AiCanOptions>(builder.Configuration.GetSection("AiCan"));
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -146,7 +145,8 @@ app.MapPost("/documents/search", (
     IDocumentCatalog catalog) =>
 {
     var session = users.RequireSession(request);
-    var results = catalog.Search(session.UserId, session.Department, query.Query)
+    var tenantDomain = ITenantRegistry.ExtractDomain(session.Email);
+    var results = catalog.Search(session.UserId, session.Department, tenantDomain, query.Query)
         .Select(document => new DocumentSearchResultDto(
             document.Id,
             document.Title,
@@ -173,13 +173,8 @@ app.MapGet("/documents/{documentId:guid}", (
         return Results.NotFound();
     }
 
-    var canRead = document.Visibility switch
-    {
-        VisibilityScope.Private => document.OwnerUserId == session.UserId,
-        VisibilityScope.DepartmentShared => string.Equals(document.Department, session.Department, StringComparison.OrdinalIgnoreCase),
-        VisibilityScope.CommonShared => true,
-        _ => false
-    };
+    var tenantDomain = ITenantRegistry.ExtractDomain(session.Email);
+    var canRead = CanAccessDocument(document, session, tenantDomain);
 
     if (!canRead)
     {
@@ -234,6 +229,18 @@ app.MapPost("/actions/reclassification-suggest", (
     IClock clock) =>
 {
     var session = users.RequireSession(request);
+    var document = catalog.Get(action.DocumentId);
+    if (document is null)
+    {
+        return Results.NotFound();
+    }
+
+    var tenantDomain = ITenantRegistry.ExtractDomain(session.Email);
+    if (!CanAccessDocument(document, session, tenantDomain))
+    {
+        return Results.Forbid();
+    }
+
     catalog.MarkSuggestion(action.DocumentId, action.ProposedCategory, action.Reason);
     var response = new ActionResponse(Guid.NewGuid(), "submitted", clock.UtcNow);
     audit.Write(session.UserId, "document.reclassification.suggested", action.DocumentId.ToString(), clock.UtcNow);
@@ -243,3 +250,61 @@ app.MapPost("/actions/reclassification-suggest", (
 await app.Services.GetRequiredService<IRagBootstrapper>().EnsureIndexedAsync(CancellationToken.None);
 
 app.Run();
+
+static void ConfigureRuntimeConfiguration(WebApplicationBuilder builder)
+{
+    var environmentName = builder.Environment.EnvironmentName;
+    var candidateRoots = new[]
+    {
+        AppContext.BaseDirectory,
+        builder.Environment.ContentRootPath,
+        Path.Combine(builder.Environment.ContentRootPath, "src", "AiCan.Api")
+    }
+    .Where(Directory.Exists)
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
+    foreach (var root in candidateRoots)
+    {
+        AddJsonFile(builder.Configuration, root, "appsettings.json");
+        AddJsonFile(builder.Configuration, root, $"appsettings.{environmentName}.json");
+    }
+
+    // Apply git-ignored local overrides last so a built DLL still picks up
+    // developer-specific settings without depending on the current working directory.
+    foreach (var root in candidateRoots)
+    {
+        AddJsonFile(builder.Configuration, root, "appsettings.Local.json");
+    }
+}
+
+static void AddJsonFile(ConfigurationManager configuration, string root, string fileName)
+{
+    configuration.AddJsonFile(
+        new PhysicalFileProvider(root),
+        fileName,
+        optional: true,
+        reloadOnChange: false);
+}
+
+static bool CanAccessDocument(CatalogDocument document, SessionExchangeResponse session, string tenantDomain)
+{
+    if (!IsTenantVisibleToUser(document, tenantDomain))
+    {
+        return false;
+    }
+
+    return document.Visibility switch
+    {
+        VisibilityScope.Private => document.OwnerUserId == session.UserId,
+        VisibilityScope.DepartmentShared => string.Equals(document.Department, session.Department, StringComparison.OrdinalIgnoreCase),
+        VisibilityScope.CommonShared => true,
+        _ => false
+    };
+}
+
+static bool IsTenantVisibleToUser(CatalogDocument document, string tenantDomain)
+{
+    return string.Equals(document.TenantDomain, tenantDomain, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(document.TenantDomain, "common", StringComparison.OrdinalIgnoreCase);
+}
