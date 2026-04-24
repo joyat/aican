@@ -16,9 +16,14 @@ Enable AiCan desktop sign-in with real `@sungas.com.bd` Microsoft 365 identities
 - `AICAN_M365_CLIENT_ID`
 - `AICAN_M365_TENANT_ID` (recommended for tenant-specific login)
 
+## Sungas Entra Values
+
+- `AICAN_M365_CLIENT_ID=2504bc5e-3683-4f5d-8007-9c1ef6bfee1f`
+- `AICAN_M365_TENANT_ID=d0dbcfe9-f3ae-4822-8ba1-6a4144e7d25c`
+
 ## Bootstrap User Seats In This Repo
 
-- `admin_bot@sungas.com.bd`
+- `consultant@sungas.com.bd` -> `Admin_Bot`
 - `cfo_bot@sungas.com.bd`
 - `it_bot@sungas.com.bd`
 
