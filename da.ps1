@@ -1,8 +1,8 @@
 # AiCan full deploy — run from Windows PowerShell
 # Pulls updated files from Mac, pushes Services.cs to Ubuntu, rebuilds both
 $ErrorActionPreference = "Continue"
-$ubuntu   = "joyat@100.97.72.86"
-$mac      = "joyatsaha@100.81.186.55"
+$ubuntu   = "joyat@sungas-ubuntulab.tail6932f9.ts.net"
+$mac      = "joyatsaha@joys-macbookpro.tail6932f9.ts.net"
 $winRoot  = "C:\Users\joyat\projects\aican"
 $ubuntuRoot = "/home/joyat/projects/aican"
 $macRoot  = "/Users/joyatsaha/projects/aican"
@@ -24,7 +24,7 @@ nohup dotnet src/AiCan.Api/bin/Release/net8.0/AiCan.Api.dll --urls http://0.0.0.
 "@
 Start-Sleep -Seconds 5
 Write-Host "Ubuntu healthz: " -NoNewline
-curl -s http://100.97.72.86:5000/healthz
+curl -s http://sungas-ubuntulab.tail6932f9.ts.net:5000/healthz
 
 Write-Host ""
 Write-Host "=== 3/4  Rebuild Windows desktop ===" -ForegroundColor Cyan

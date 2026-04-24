@@ -22,9 +22,9 @@ fi
 echo "=== AiCan API deploy ==="
 
 # 1. Stop any running API
-if fuser 5080/tcp &>/dev/null; then
-  echo "Stopping running API on port 5080..."
-  fuser -k 5080/tcp || true
+if fuser 5000/tcp &>/dev/null; then
+  echo "Stopping running API on port 5000..."
+  fuser -k 5000/tcp || true
   sleep 3
 fi
 
@@ -38,10 +38,10 @@ touch src/AiCan.Api/Services.cs
 mkdir -p .runtime/logs
 echo "Starting API..."
 nohup "$DOTNET_BIN" src/AiCan.Api/bin/Release/net8.0/AiCan.Api.dll \
-  --urls http://0.0.0.0:5080 \
+  --urls http://0.0.0.0:5000 \
   > "$API_LOG" 2>&1 &
 
 sleep 4
 echo "Checking health..."
-curl -s http://127.0.0.1:5080/healthz && echo " OK" || echo " FAILED - check $API_LOG"
+curl -s http://127.0.0.1:5000/healthz && echo " OK" || echo " FAILED - check $API_LOG"
 echo "=== Done ==="

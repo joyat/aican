@@ -1,0 +1,35 @@
+{
+  "admin_bot@sungas.com.bd": {
+    "displayName": "Sun Gas Admin Seat",
+    "botName": "Admin_Bot",
+    "department": "Administration",
+    "role": "PlatformAdmin",
+    "tone": "WarmProfessional",
+    "workStyle": "HelpfulAndConcise",
+    "language": "en",
+    "title": "Administrative Bot Seat",
+    "location": "Dhaka"
+  },
+  "cfo_bot@sungas.com.bd": {
+    "displayName": "Sun Gas Finance Seat",
+    "botName": "CFO_Bot",
+    "department": "Finance",
+    "role": "User",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en",
+    "title": "Finance Bot Seat",
+    "location": "Dhaka"
+  },
+  "it_bot@sungas.com.bd": {
+    "displayName": "Sun Gas IT Seat",
+    "botName": "IT_Bot",
+    "department": "IT",
+    "role": "DocAdmin",
+    "tone": "Formal",
+    "workStyle": "Precise",
+    "language": "en",
+    "title": "IT Bot Seat",
+    "location": "Dhaka"
+  }
+}

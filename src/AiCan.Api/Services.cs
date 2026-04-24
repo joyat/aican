@@ -76,11 +76,13 @@ public sealed class SeedUserOptions
 
 public sealed class SeedDocumentOptions
 {
+    public string TenantDomain { get; set; } = "common";
     public string Title { get; set; } = string.Empty;
     public string Department { get; set; } = "General";
     public VisibilityScope Visibility { get; set; } = VisibilityScope.CommonShared;
     public string Classification { get; set; } = "general";
     public string RepositoryPathSegment { get; set; } = string.Empty;
+    public string SourceFilePath { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
 }
@@ -688,7 +690,11 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         var changed = false;
         foreach (var seed in seeds)
         {
+            var tenantDomain = string.IsNullOrWhiteSpace(seed.TenantDomain)
+                ? "common"
+                : seed.TenantDomain.Trim().ToLowerInvariant();
             if (_documents.Values.Any(document =>
+                string.Equals(document.TenantDomain, tenantDomain, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(document.Title, seed.Title, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(document.RepositoryPath, Path.Combine(paths.RepositoryRoot, seed.RepositoryPathSegment).Replace('\\', '/'), StringComparison.OrdinalIgnoreCase)))
             {
@@ -697,23 +703,25 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
 
             var repositoryPath = Path.Combine(paths.RepositoryRoot, seed.RepositoryPathSegment);
             Directory.CreateDirectory(Path.GetDirectoryName(repositoryPath)!);
+            var seededContent = ResolveSeedContent(seed);
 
-            if (!string.IsNullOrWhiteSpace(seed.Content) && !File.Exists(repositoryPath))
+            if (!string.IsNullOrWhiteSpace(seededContent) && !File.Exists(repositoryPath))
             {
-                File.WriteAllText(repositoryPath, seed.Content);
+                File.WriteAllText(repositoryPath, seededContent);
             }
 
             var document = new CatalogDocument
             {
                 Id = Guid.NewGuid(),
                 OwnerUserId = Guid.Empty,
+                TenantDomain = tenantDomain,
                 Title = seed.Title,
                 Department = seed.Department,
                 Visibility = seed.Visibility,
                 Classification = seed.Classification,
                 RepositoryPath = repositoryPath.Replace('\\', '/'),
                 Summary = seed.Summary,
-                ExtractedText = string.IsNullOrWhiteSpace(seed.Content) ? seed.Summary : seed.Content
+                ExtractedText = string.IsNullOrWhiteSpace(seededContent) ? seed.Summary : seededContent
             };
 
             _documents[document.Id] = document;
@@ -724,6 +732,22 @@ public sealed class InMemoryDocumentCatalog : IDocumentCatalog
         {
             Persist();
         }
+    }
+
+    private static string ResolveSeedContent(SeedDocumentOptions seed)
+    {
+        if (!string.IsNullOrWhiteSpace(seed.Content))
+        {
+            return seed.Content;
+        }
+
+        if (string.IsNullOrWhiteSpace(seed.SourceFilePath))
+        {
+            return string.Empty;
+        }
+
+        var path = Path.GetFullPath(seed.SourceFilePath);
+        return File.Exists(path) ? File.ReadAllText(path) : string.Empty;
     }
 
     private void Persist()

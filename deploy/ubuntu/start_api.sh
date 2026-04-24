@@ -37,7 +37,7 @@ echo "Building API ($BUILD_CONFIG)..."
 "$DOTNET_BIN" build "$ROOT_DIR/src/AiCan.Api/AiCan.Api.csproj" -c "$BUILD_CONFIG" --nologo -v q >/dev/null
 
 nohup env \
-  ASPNETCORE_URLS="${ASPNETCORE_URLS:-http://0.0.0.0:5080}" \
+  ASPNETCORE_URLS="${ASPNETCORE_URLS:-http://0.0.0.0:5000}" \
   ASPNETCORE_ENVIRONMENT="${ASPNETCORE_ENVIRONMENT:-Local}" \
   "$DOTNET_BIN" "$API_DLL" \
   >"$API_LOG" 2>&1 &

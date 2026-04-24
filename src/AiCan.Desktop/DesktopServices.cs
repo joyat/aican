@@ -24,7 +24,7 @@ public sealed record ApiHealthResponse(string Status);
 
 public static class DemoDefaults
 {
-    public const string ServerUrl = "http://127.0.0.1:5080";
+    public const string ServerUrl = "http://sungas-ubuntulab.tail6932f9.ts.net:5000";
     public const string Email = "user@example.test";
     public const string DisplayName = "Demo User";
     public const string BotName = "AiCan Assistant";
@@ -35,8 +35,22 @@ public static class DemoDefaults
 public sealed class M365AuthService
 {
     private const string PlaceholderClientId = "00000000-0000-0000-0000-000000000000";
-    private const string ClientId = PlaceholderClientId;
     private static readonly string[] Scopes = ["User.Read"];
+
+    private static string ClientId =>
+        Environment.GetEnvironmentVariable("AICAN_M365_CLIENT_ID")?.Trim()
+        ?? PlaceholderClientId;
+
+    private static string Authority
+    {
+        get
+        {
+            var tenantId = Environment.GetEnvironmentVariable("AICAN_M365_TENANT_ID")?.Trim();
+            return string.IsNullOrWhiteSpace(tenantId)
+                ? "https://login.microsoftonline.com/common"
+                : $"https://login.microsoftonline.com/{tenantId}";
+        }
+    }
 
     public bool IsConfigured => !string.Equals(ClientId, PlaceholderClientId, StringComparison.Ordinal);
 
@@ -44,11 +58,12 @@ public sealed class M365AuthService
     {
         if (!IsConfigured)
         {
-            throw new InvalidOperationException("Microsoft 365 sign-in is not configured in this demo build. Use Connect Bot for the local demo flow.");
+            throw new InvalidOperationException("Microsoft 365 sign-in is not configured. Set AICAN_M365_CLIENT_ID first, then retry.");
         }
 
         var application = PublicClientApplicationBuilder
             .Create(ClientId)
+            .WithAuthority(Authority)
             .WithDefaultRedirectUri()
             .Build();
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${AICAN_BASE_URL:-http://127.0.0.1:5080}"
+BASE_URL="${AICAN_BASE_URL:-http://sungas-ubuntulab.tail6932f9.ts.net:5000}"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

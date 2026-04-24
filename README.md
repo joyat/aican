@@ -2,7 +2,7 @@
 
 AiCan is a multi-tenant workplace assistant platform for internal knowledge retrieval, document intake, and guided chat. It combines a desktop client, a .NET API, a Python AI worker, tenant-scoped prompt configuration, and a vector index so each organization can run the same product with isolated identity, policy, and retrieval context.
 
-The repository is public. Infrastructure endpoints, host-specific paths, and machine-specific credentials are intentionally excluded from the committed defaults. Tenant domains, employee rosters, and documents under `integrations/openclaw/workspace/tenants/` are synthetic demo data.
+The repository is public. Infrastructure endpoints, host-specific paths, and machine-specific credentials are intentionally excluded from the committed defaults. Content under `integrations/openclaw/workspace/tenants/` should be treated as synthetic demo data or public bootstrap material only. Do not commit confidential customer documents or internal-only customer facts.
 
 ## What the system does
 
@@ -155,7 +155,8 @@ uvicorn main:app --host 127.0.0.1 --port 8001
 dotnet run --project src/AiCan.Api/AiCan.Api.csproj
 ```
 
-The default local API endpoint used by the desktop client and smoke test is `http://127.0.0.1:5080`.
+The default demo API endpoint used by the desktop client and smoke test is `http://sungas-ubuntulab.tail6932f9.ts.net:5000`.
+For local-only development, override the desktop server URL or run `AICAN_BASE_URL=http://127.0.0.1:5000 bash scripts/demo_smoke_test.sh`.
 
 You can also use the helper scripts:
 
@@ -177,6 +178,24 @@ Build the desktop client from Windows:
 ```powershell
 dotnet build src\AiCan.Desktop\AiCan.Desktop.csproj -c Release
 ```
+
+### Microsoft 365 sign-in
+
+The Windows desktop client can use Microsoft 365 interactive sign-in through MSAL. It now reads these environment variables at runtime:
+
+- `AICAN_M365_CLIENT_ID`
+- `AICAN_M365_TENANT_ID` (recommended; falls back to `common` if omitted)
+
+Example on Windows PowerShell:
+
+```powershell
+$env:AICAN_M365_CLIENT_ID = "<entra-app-client-id>"
+$env:AICAN_M365_TENANT_ID = "<entra-tenant-id>"
+```
+
+Current scope requested by the desktop client: `User.Read`.
+
+The current code uses Microsoft sign-in to authenticate the desktop user and bootstrap the AiCan session. Fine-grained authorization inside AiCan is still driven by the user email domain plus the tenant `users.json` registry.
 
 ## Public repo hygiene
 

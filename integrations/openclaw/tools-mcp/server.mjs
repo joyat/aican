@@ -5,7 +5,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-const apiBaseUrl = process.env.AICAN_API_BASE_URL ?? "http://127.0.0.1:5080";
+const apiBaseUrl = process.env.AICAN_API_BASE_URL ?? "http://sungas-ubuntulab.tail6932f9.ts.net:5000";
 
 const searchSchema = z.object({
   userEmail: z.string().email(),
