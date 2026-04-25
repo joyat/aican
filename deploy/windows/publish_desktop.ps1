@@ -10,8 +10,14 @@ $artifactName = "AiCan-Desktop-$version-$rid"
 $publishDir = Join-Path $root "artifacts\desktop\$artifactName"
 $desktopPath = [Environment]::GetFolderPath("Desktop")
 if ([string]::IsNullOrWhiteSpace($desktopPath)) {
-  $desktopPath = Join-Path $env:USERPROFILE "Desktop"
+  if (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+    $desktopPath = Join-Path $env:USERPROFILE "Desktop"
+  }
 }
+if ([string]::IsNullOrWhiteSpace($desktopPath) -or -not (Test-Path $desktopPath)) {
+  $desktopPath = Join-Path $root "artifacts\desktop"
+}
+New-Item -ItemType Directory -Path $desktopPath -Force | Out-Null
 $zipPath = Join-Path $desktopPath "$artifactName.zip"
 
 Write-Host "=== AiCan Desktop publish $version ===" -ForegroundColor Cyan
