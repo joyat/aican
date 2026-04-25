@@ -185,7 +185,7 @@ Publish the versioned self-contained desktop package from Windows:
 powershell -ExecutionPolicy Bypass -File deploy\windows\publish_desktop.ps1
 ```
 
-This produces a versioned folder under `artifacts\desktop\` and a matching zip on the Windows desktop, for example `AiCan-Desktop-v5.1.1-win-x64.zip`.
+This produces a versioned folder under `artifacts\desktop\` and a matching zip on the Windows desktop, for example `AiCan-Desktop-v5.2-win-x64.zip`.
 
 ### Microsoft 365 sign-in
 
