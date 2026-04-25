@@ -25,7 +25,7 @@ Enable AiCan desktop sign-in with real `@sungas.com.bd` Microsoft 365 identities
 
 - `consultant@sungas.com.bd` -> `Admin_Bot`
 - `cfo_bot@sungas.com.bd`
-- `it_bot@sungas.com.bd`
+- `joyat.biju@sungas.com.bd` -> `IT_Bot`
 
 Replace or extend these with real employee emails once tenant onboarding is confirmed.
 
