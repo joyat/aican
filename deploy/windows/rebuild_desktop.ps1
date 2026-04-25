@@ -1,4 +1,4 @@
-# Rebuild AiCan Desktop and relaunch.
+# Rebuild AiCan Desktop v5.1 and relaunch.
 
 $root = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
 $proj = "$root\src\AiCan.Desktop\AiCan.Desktop.csproj"
@@ -6,7 +6,7 @@ $exe  = "$root\src\AiCan.Desktop\bin\Release\net8.0-windows10.0.19041.0\AiCan.De
 $task = "AiCanDesktopLaunch"
 $currentUser = $env:USERNAME
 
-Write-Host "=== AiCan Desktop rebuild ===" -ForegroundColor Cyan
+Write-Host "=== AiCan Desktop v5.1 rebuild ===" -ForegroundColor Cyan
 
 # Kill running instance
 Get-Process -Name "AiCan.Desktop" -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -22,4 +22,4 @@ Write-Host "Launching in interactive session..."
 schtasks /create /f /tn $task /sc once /st 00:00 /tr $exe /ru $currentUser /it | Out-Null
 schtasks /run /tn $task | Out-Null
 
-Write-Host "=== Done - AiCan Desktop launched ===" -ForegroundColor Green
+Write-Host "=== Done - AiCan Desktop v5.1 launched ===" -ForegroundColor Green

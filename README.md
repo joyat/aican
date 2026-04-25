@@ -179,6 +179,14 @@ Build the desktop client from Windows:
 dotnet build src\AiCan.Desktop\AiCan.Desktop.csproj -c Release
 ```
 
+Publish the versioned self-contained desktop package from Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\publish_desktop.ps1
+```
+
+This produces a versioned folder under `artifacts\desktop\` and a matching zip on the Windows desktop, for example `AiCan-Desktop-v5.1-win-x64.zip`.
+
 ### Microsoft 365 sign-in
 
 The Windows desktop client can use Microsoft 365 interactive sign-in through MSAL. It now reads these environment variables at runtime:
