@@ -1,7 +1,7 @@
 <Window x:Class="AiCan.Desktop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="AiCan v5.1"
+        Title="AiCan v5.1.1"
         Icon="Assets/AiCan-mascot.png"
         Width="1340"
         Height="880"

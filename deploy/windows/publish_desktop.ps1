@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
 $proj = Join-Path $root "src\AiCan.Desktop\AiCan.Desktop.csproj"
-$version = "v5.1"
+$version = "v5.1.1"
 $rid = "win-x64"
 $artifactName = "AiCan-Desktop-$version-$rid"
 $publishDir = Join-Path $root "artifacts\desktop\$artifactName"

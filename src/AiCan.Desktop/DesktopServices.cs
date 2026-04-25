@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AiCan.Contracts;
 using Microsoft.Identity.Client;
 
@@ -77,6 +78,11 @@ public sealed class M365AuthService
 
 public sealed class DesktopApiClient
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     // 180 s gives a slow local LLM endpoint enough time to respond
     // without leaving the UI locked indefinitely.
     private readonly HttpClient _httpClient = new()
@@ -94,7 +100,7 @@ public sealed class DesktopApiClient
     {
         using var response = await _httpClient.GetAsync($"{serverUrl.TrimEnd('/')}/system/status");
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<SystemStatusResponse>()
+        return await response.Content.ReadFromJsonAsync<SystemStatusResponse>(JsonOptions)
             ?? new SystemStatusResponse(Array.Empty<ServiceHealthDto>(), DateTimeOffset.UtcNow);
     }
 
@@ -102,9 +108,9 @@ public sealed class DesktopApiClient
     {
         var response = await _httpClient.PostAsync(
             $"{serverUrl.TrimEnd('/')}/session/exchange",
-            JsonContent.Create(request));
+            JsonContent.Create(request, options: JsonOptions));
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<SessionExchangeResponse>() ?? throw new InvalidOperationException("Missing session response.");
+        return await response.Content.ReadFromJsonAsync<SessionExchangeResponse>(JsonOptions) ?? throw new InvalidOperationException("Missing session response.");
     }
 
     public async Task<AssistantProfileDto> UpdateProfileAsync(string serverUrl, string sessionToken, UpdateAssistantProfileRequest request)
@@ -112,7 +118,7 @@ public sealed class DesktopApiClient
         using var message = CreateAuthorized(HttpMethod.Patch, $"{serverUrl.TrimEnd('/')}/assistant/profile", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<AssistantProfileDto>() ?? throw new InvalidOperationException("Missing profile response.");
+        return await response.Content.ReadFromJsonAsync<AssistantProfileDto>(JsonOptions) ?? throw new InvalidOperationException("Missing profile response.");
     }
 
     public async Task<IReadOnlyList<HistoryMessageDto>> GetHistoryAsync(string serverUrl, string sessionToken)
@@ -120,7 +126,7 @@ public sealed class DesktopApiClient
         using var message = CreateAuthorized(HttpMethod.Get, $"{serverUrl.TrimEnd('/')}/assistant/history", sessionToken);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IReadOnlyList<HistoryMessageDto>>() ?? Array.Empty<HistoryMessageDto>();
+        return await response.Content.ReadFromJsonAsync<IReadOnlyList<HistoryMessageDto>>(JsonOptions) ?? Array.Empty<HistoryMessageDto>();
     }
 
     public async Task<ChatResponse> ChatAsync(string serverUrl, string sessionToken, ChatRequest request)
@@ -128,7 +134,7 @@ public sealed class DesktopApiClient
         using var message = CreateAuthorized(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/assistant/chat", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<ChatResponse>() ?? throw new InvalidOperationException("Missing chat response.");
+        return await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions) ?? throw new InvalidOperationException("Missing chat response.");
     }
 
     public async Task<IntakeRegisterResponse> RegisterFileAsync(string serverUrl, string sessionToken, IntakeRegisterRequest request)
@@ -136,13 +142,13 @@ public sealed class DesktopApiClient
         using var message = CreateAuthorized(HttpMethod.Post, $"{serverUrl.TrimEnd('/')}/documents/intake/register", sessionToken, request);
         using var response = await _httpClient.SendAsync(message);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<IntakeRegisterResponse>() ?? throw new InvalidOperationException("Missing intake response.");
+        return await response.Content.ReadFromJsonAsync<IntakeRegisterResponse>(JsonOptions) ?? throw new InvalidOperationException("Missing intake response.");
     }
 
     private static HttpRequestMessage CreateAuthorized<T>(HttpMethod method, string url, string sessionToken, T payload)
     {
         var message = CreateAuthorized(method, url, sessionToken);
-        message.Content = JsonContent.Create(payload);
+        message.Content = JsonContent.Create(payload, options: JsonOptions);
         return message;
     }
 
