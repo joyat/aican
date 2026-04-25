@@ -8,7 +8,11 @@ $version = "v5.2"
 $rid = "win-x64"
 $artifactName = "AiCan-Desktop-$version-$rid"
 $publishDir = Join-Path $root "artifacts\desktop\$artifactName"
-$zipPath = Join-Path ([Environment]::GetFolderPath("Desktop")) "$artifactName.zip"
+$desktopPath = [Environment]::GetFolderPath("Desktop")
+if ([string]::IsNullOrWhiteSpace($desktopPath)) {
+  $desktopPath = Join-Path $env:USERPROFILE "Desktop"
+}
+$zipPath = Join-Path $desktopPath "$artifactName.zip"
 
 Write-Host "=== AiCan Desktop publish $version ===" -ForegroundColor Cyan
 
